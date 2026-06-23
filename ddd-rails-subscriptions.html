@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DDD-модуль на Rails: модуль Subscriptions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#e4ede8;
+  --paper:#0e1513;
+  --paper-2:#161f1b;
+  --moss:#5fa085;
+  --moss-bright:#6fc4a3;
+  --clay:#e07d44;
+  --clay-soft:#d98a5c;
+  --gold:#ceaa56;
+  --line:#27332d;
+  --code-bg:#080d0b;
+  --code-ink:#d6e4dd;
+  --shadow:0 1px 0 rgba(0,0,0,.3);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Inter',system-ui,sans-serif;
+  line-height:1.65;
+  font-size:16px;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{display:grid;grid-template-columns:260px 1fr;max-width:1340px;margin:0 auto;min-height:100vh}
+
+/* ---- NAV ---- */
+nav{
+  position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+  padding:38px 26px;border-right:1px solid var(--line);
+  background:var(--paper-2);
+}
+nav .brand{font-family:'Fraunces',serif;font-weight:900;font-size:23px;line-height:1.1;letter-spacing:-.02em}
+nav .brand em{color:var(--clay);font-style:normal}
+nav .sub{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--moss);margin-top:8px;margin-bottom:30px}
+nav a{
+  display:block;text-decoration:none;color:var(--ink);
+  font-size:14px;padding:7px 12px;border-radius:7px;margin-bottom:2px;
+  border-left:2px solid transparent;transition:.18s;
+}
+nav a .n{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--gold);margin-right:9px}
+nav a:hover{background:rgba(47,93,79,.09)}
+nav a.active{background:rgba(95,160,133,.16);color:var(--ink);border-left-color:var(--clay)}
+nav a.active .n{color:var(--clay)}
+nav .group{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--moss);margin:22px 0 8px 12px;opacity:.7}
+
+/* ---- MAIN ---- */
+main{padding:0 64px 120px;max-width:920px}
+.hero{padding:78px 0 50px;border-bottom:1px solid var(--line)}
+.hero .eyebrow{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--clay);margin-bottom:22px}
+.hero h1{font-family:'Fraunces',serif;font-weight:900;font-size:clamp(38px,5.5vw,62px);line-height:1.02;letter-spacing:-.03em}
+.hero h1 em{font-style:italic;color:var(--moss)}
+.hero p{font-size:18px;max-width:620px;margin-top:24px;color:#3a463f}
+.hero .meta{display:flex;gap:28px;margin-top:34px;flex-wrap:wrap}
+.hero .meta div{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--moss)}
+.hero .meta b{display:block;font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:var(--ink);letter-spacing:-.02em}
+.hero p{color:#9db3a8}
+
+section{padding:62px 0;border-bottom:1px solid var(--line);scroll-margin-top:20px}
+section .tag{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--clay);margin-bottom:14px}
+h2{font-family:'Fraunces',serif;font-weight:600;font-size:34px;letter-spacing:-.02em;line-height:1.1;margin-bottom:8px}
+h3{font-family:'Fraunces',serif;font-weight:600;font-size:21px;margin:34px 0 10px;letter-spacing:-.01em}
+p{margin:14px 0}
+ul,ol{margin:14px 0 14px 22px}
+li{margin:6px 0}
+strong{color:var(--moss);font-weight:600}
+code.inl{font-family:'JetBrains Mono',monospace;font-size:.85em;background:var(--paper-2);padding:2px 6px;border-radius:4px;color:var(--clay);border:1px solid var(--line)}
+
+/* ---- CODE BLOCKS ---- */
+.code{position:relative;margin:20px 0;border-radius:12px;overflow:hidden;border:1px solid #0c1311}
+.code .bar{display:flex;align-items:center;justify-content:space-between;background:#0d1614;padding:9px 16px;border-bottom:1px solid #1f2d29}
+.code .bar .fname{font-family:'JetBrains Mono',monospace;font-size:12px;color:#7fae9c}
+.code .bar .fname b{color:#cfe0d8;font-weight:500}
+.code .copy{font-family:'JetBrains Mono',monospace;font-size:11px;background:transparent;border:1px solid #2d4339;color:#7fae9c;padding:4px 11px;border-radius:6px;cursor:pointer;transition:.15s}
+.code .copy:hover{background:var(--moss);color:#fff;border-color:var(--moss)}
+.code pre{background:var(--code-bg);color:var(--code-ink);padding:18px 20px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;tab-size:2}
+.code pre .c{color:#5d8273;font-style:italic}
+.code pre .k{color:#e0a35e}
+.code pre .s{color:#9ecb8a}
+.code pre .m{color:#73b8e0}
+.code pre .cls{color:#e7d59b}
+.code pre .sym{color:#c98ad0}
+
+/* ---- CALLOUTS ---- */
+.callout{border-left:3px solid var(--clay);background:var(--paper-2);padding:16px 20px;border-radius:0 10px 10px 0;margin:22px 0}
+.callout .lbl{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--clay);margin-bottom:6px}
+.callout.good{border-left-color:var(--moss-bright)}
+.callout.good .lbl{color:var(--moss-bright)}
+.callout.bad{border-left-color:#b3492a}
+.callout.bad .lbl{color:#b3492a}
+
+/* ---- ARCH DIAGRAM ---- */
+.arch{margin:26px 0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--paper-2)}
+.layer{display:grid;grid-template-columns:150px 1fr;border-bottom:1px solid var(--line);cursor:pointer;transition:.18s}
+.layer:last-child{border-bottom:none}
+.layer:hover{background:var(--paper-2)}
+.layer .ll{padding:18px 18px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:8px;border-right:1px solid var(--line)}
+.layer .ll .dot{width:9px;height:9px;border-radius:50%}
+.layer .lr{padding:18px 22px}
+.layer .lr .lt{font-weight:600;font-size:15px;color:var(--ink)}
+.layer .lr .ld{font-size:13.5px;color:#9db3a8;margin-top:3px}
+.layer .lr .files{margin-top:9px;display:flex;flex-wrap:wrap;gap:6px}
+.layer .lr .files span{font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--paper);border:1px solid var(--line);padding:2px 8px;border-radius:5px;color:var(--moss)}
+/* ---- TABLE ---- */
+table{width:100%;border-collapse:collapse;margin:22px 0;font-size:14px}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--moss);background:var(--paper-2)}
+td code{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--clay)}
+
+/* ---- TREE ---- */
+.tree{background:var(--code-bg);color:var(--code-ink);border-radius:12px;padding:22px 24px;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.85;overflow-x:auto;border:1px solid #0c1311;margin:22px 0;white-space:pre}
+.tree .d{color:#73b8e0}
+.tree .f{color:#cfe0d8}
+.tree .cm{color:#5d8273}
+
+footer{padding:50px 0 0;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--moss)}
+
+@media(max-width:920px){
+  .wrap{grid-template-columns:1fr}
+  nav{display:none}
+  main{padding:0 24px 80px}
+  .layer{grid-template-columns:1fr}
+  .layer .ll{border-right:none;border-bottom:1px solid var(--line)}
+}
+::selection{background:var(--clay);color:#fff}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav id="nav">
+  <div class="brand">DDD <em>×</em> Rails</div>
+  <div class="sub">Модуль Subscriptions</div>
+
+  <div class="group">Основа</div>
+  <a href="#intro"><span class="n">00</span>Введение</a>
+  <a href="#why"><span class="n">01</span>Зачем DDD на Rails</a>
+  <a href="#structure"><span class="n">02</span>Структура модуля</a>
+  <a href="#layers"><span class="n">03</span>Слои и зависимости</a>
+
+  <div class="group">Тактические паттерны</div>
+  <a href="#value-objects"><span class="n">04</span>Value Objects</a>
+  <a href="#entities"><span class="n">05</span>Entities</a>
+  <a href="#aggregate"><span class="n">06</span>Aggregate Root</a>
+  <a href="#events"><span class="n">07</span>Domain Events</a>
+  <a href="#repository"><span class="n">08</span>Repository</a>
+  <a href="#service"><span class="n">09</span>Domain / App Services</a>
+
+  <div class="group">Сборка</div>
+  <a href="#flow"><span class="n">10</span>Полный сценарий</a>
+  <a href="#boundary"><span class="n">11</span>Публичный API модуля</a>
+  <a href="#testing"><span class="n">12</span>Тестирование</a>
+  <a href="#pitfalls"><span class="n">13</span>Грабли и итог</a>
+</nav>
+
+<main>
+<header class="hero" id="intro">
+  <div class="eyebrow">Практическое руководство · Pure Ruby + Rails</div>
+  <h1>Как построить <em>DDD-модуль</em> на Rails без единой внешней зависимости</h1>
+  <p>Разбираем на реальном примере — модуле управления подписками. От Value Object до Aggregate Root, репозитория и доменных событий. Только то, что уже есть в Rails и Ruby.</p>
+  <div class="meta">
+    <div><b>0</b>внешних гемов</div>
+    <div><b>1</b>агрегат</div>
+    <div><b>6</b>тактических паттернов</div>
+    <div><b>4</b>слоя</div>
+  </div>
+</header>
+
+<section id="why">
+  <div class="tag">Мотивация</div>
+  <h2>Зачем вообще DDD, если есть ActiveRecord</h2>
+  <p>Стандартный Rails-подход — «толстая модель» (fat model), где <code class="inl">ApplicationRecord</code> совмещает персистентность, бизнес-правила, валидации, колбэки и связи. На небольшом приложении это работает прекрасно. Боль начинается, когда бизнес-логика разрастается: колбэки дёргают друг друга, валидации зависят от контекста, а один класс отвечает сразу за всё.</p>
+  <p>DDD предлагает разделить <strong>модель предметной области</strong> (как устроен бизнес) и <strong>модель хранения</strong> (как лежит в базе). Доменные объекты ничего не знают про SQL, колбэки и Rails — это просто Ruby-объекты, выражающие правила. ActiveRecord становится деталью инфраструктуры, спрятанной за репозиторием.</p>
+  <div class="callout">
+    <div class="lbl">Ключевая идея</div>
+    Домен — чистый Ruby. Rails — инфраструктура. Граница между ними проходит по репозиторию и публичному API модуля. Внутрь домена ActiveRecord не протекает.
+  </div>
+  <p>Возьмём конкретную задачу: <strong>модуль подписок</strong>. Клиент оформляет платную подписку на тариф, она активна определённый период, её можно поставить на паузу, возобновить, отменить. При отмене раньше срока — частичный возврат. Это классический ограниченный контекст (bounded context) с богатыми правилами.</p>
+</section>
+
+<section id="structure">
+  <div class="tag">Раскладка по файлам</div>
+  <h2>Структура модуля внутри Rails-приложения</h2>
+  <p>Модуль живёт под <code class="inl">app/modules/subscriptions</code> и изолирован от остального приложения. Внутри — собственная слоистая структура. Имя верхнего namespace <code class="inl">Subscriptions</code> повторяет ограниченный контекст.</p>
+  <div class="tree">
+<span class="cm"># app/modules/subscriptions/</span>
+<span class="d">subscriptions/</span>
+├─ <span class="d">domain/</span>                  <span class="cm"># чистый Ruby, ноль Rails</span>
+│  ├─ <span class="d">value_objects/</span>
+│  │  ├─ <span class="f">money.rb</span>
+│  │  ├─ <span class="f">billing_period.rb</span>
+│  │  └─ <span class="f">subscription_status.rb</span>
+│  ├─ <span class="d">entities/</span>
+│  │  └─ <span class="f">subscription.rb</span>      <span class="cm"># Aggregate Root</span>
+│  ├─ <span class="d">events/</span>
+│  │  ├─ <span class="f">subscription_activated.rb</span>
+│  │  ├─ <span class="f">subscription_paused.rb</span>
+│  │  └─ <span class="f">subscription_cancelled.rb</span>
+│  └─ <span class="d">repositories/</span>
+│     └─ <span class="f">subscription_repository.rb</span>  <span class="cm"># интерфейс</span>
+├─ <span class="d">application/</span>             <span class="cm"># оркестрация use-cases</span>
+│  ├─ <span class="f">activate_subscription.rb</span>
+│  ├─ <span class="f">cancel_subscription.rb</span>
+│  └─ <span class="f">pause_subscription.rb</span>
+├─ <span class="d">infrastructure/</span>          <span class="cm"># здесь живёт ActiveRecord</span>
+│  ├─ <span class="d">records/</span>
+│  │  └─ <span class="f">subscription_record.rb</span>   <span class="cm"># ApplicationRecord</span>
+│  └─ <span class="f">ar_subscription_repository.rb</span>  <span class="cm"># реализация</span>
+└─ <span class="f">subscriptions.rb</span>          <span class="cm"># фасад — публичный API</span>
+  </div>
+  <p>Чтобы Rails автоматически загружал классы, добавьте путь в автозагрузку (Zeitwerk сам разберёт namespace по папкам):</p>
+  <div class="code">
+    <div class="bar"><span class="fname"><b>config/application.rb</b></span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">YourApp</span>
+  <span class="k">class</span> <span class="cls">Application</span> &lt; <span class="cls">Rails</span>::<span class="cls">Application</span>
+    <span class="c"># подключаем модули как обычные autoload-пути</span>
+    config.autoload_paths += <span class="cls">Dir</span>[<span class="cls">Rails</span>.root.join(<span class="s">"app/modules"</span>)]
+    config.eager_load_paths += <span class="cls">Dir</span>[<span class="cls">Rails</span>.root.join(<span class="s">"app/modules"</span>)]
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+</section>
+
+<section id="layers">
+  <div class="tag">Архитектура</div>
+  <h2>Четыре слоя и правило зависимостей</h2>
+  <p>Зависимости направлены <strong>только внутрь</strong>: инфраструктура знает про домен, домен про инфраструктуру — нет. Наведите курсор на слой, чтобы увидеть, что в нём лежит.</p>
+  <div class="arch">
+    <div class="layer">
+      <div class="ll"><span class="dot" style="background:#73b8e0"></span>Domain</div>
+      <div class="lr">
+        <div class="lt">Ядро. Бизнес-правила в чистом Ruby</div>
+        <div class="ld">Не зависит ни от чего. Не импортирует Rails, не знает о базе. Здесь живёт смысл предметной области.</div>
+        <div class="files"><span>Value Objects</span><span>Entities</span><span>Aggregate</span><span>Events</span><span>Repository (интерфейс)</span></div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="ll"><span class="dot" style="background:#3a7a64"></span>Application</div>
+      <div class="lr">
+        <div class="lt">Сценарии использования (use-cases)</div>
+        <div class="ld">Оркестрирует домен: загружает агрегат через репозиторий, вызывает метод, сохраняет, публикует события. Транзакционная граница.</div>
+        <div class="files"><span>ActivateSubscription</span><span>CancelSubscription</span></div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="ll"><span class="dot" style="background:#c4622d"></span>Infra</div>
+      <div class="lr">
+        <div class="lt">Инфраструктура. Реализация деталей</div>
+        <div class="ld">Здесь и только здесь — ActiveRecord. Реализует интерфейс репозитория, мапит строки БД на доменные объекты и обратно.</div>
+        <div class="files"><span>SubscriptionRecord</span><span>ArSubscriptionRepository</span></div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="ll"><span class="dot" style="background:#b8923a"></span>Facade</div>
+      <div class="lr">
+        <div class="lt">Публичный API модуля</div>
+        <div class="ld">Единственная дверь снаружи. Контроллеры и другие модули обращаются только сюда. Внутренности скрыты.</div>
+        <div class="files"><span>Subscriptions.activate(...)</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="callout good">
+    <div class="lbl">Правило зависимостей</div>
+    Стрелки указывают внутрь: Facade → Application → Domain ← Infrastructure. Домен не импортирует ничего извне. Чтобы домен мог сохранять данные, он объявляет <em>интерфейс</em> репозитория, а инфраструктура его <em>реализует</em> (инверсия зависимостей).
+  </div>
+</section>
+
+<section id="value-objects">
+  <div class="tag">Тактический паттерн · 01</div>
+  <h2>Value Objects — значения без идентичности</h2>
+  <p>Value Object описывается своими атрибутами, а не идентификатором. Два объекта <code class="inl">Money(100, "EUR")</code> равны и взаимозаменяемы. Они <strong>неизменяемы</strong> (immutable) и содержат правила, относящиеся к самому значению. В Ruby их удобно строить на <code class="inl">Data.define</code> (доступен с Ruby 3.2) — он даёт неизменяемость и равенство по значению из коробки.</p>
+  <div class="code">
+    <div class="bar"><span class="fname">domain/value_objects/<b>money.rb</b></span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">Subscriptions</span>
+  <span class="k">module</span> <span class="cls">Domain</span>
+    <span class="c"># Data.define → immutable, == по значению, без идентичности</span>
+    <span class="cls">Money</span> = <span class="cls">Data</span>.define(<span class="sym">:amount_cents</span>, <span class="sym">:currency</span>) <span class="k">do</span>
+      <span class="k">def</span> <span class="m">initialize</span>(amount_cents:, currency: <span class="s">"EUR"</span>)
+        <span class="k">raise</span> <span class="cls">ArgumentError</span>, <span class="s">"amount must be integer cents"</span> <span class="k">unless</span> amount_cents.is_a?(<span class="cls">Integer</span>)
+        <span class="k">raise</span> <span class="cls">ArgumentError</span>, <span class="s">"negative money"</span> <span class="k">if</span> amount_cents.negative?
+        <span class="k">super</span>
+      <span class="k">end</span>
+
+      <span class="k">def</span> <span class="m">+</span>(other)
+        ensure_same_currency!(other)
+        <span class="k">with</span>(amount_cents: amount_cents + other.amount_cents)
+      <span class="k">end</span>
+
+      <span class="k">def</span> <span class="m">*</span>(factor)
+        <span class="k">with</span>(amount_cents: (amount_cents * factor).round)
+      <span class="k">end</span>
+
+      <span class="k">def</span> <span class="m">zero?</span> = amount_cents.zero?
+
+      <span class="k">def</span> <span class="m">to_s</span> = <span class="s">format</span>(<span class="s">"%.2f %s"</span>, amount_cents / <span class="m">100.0</span>, currency)
+
+      <span class="k">private</span>
+
+      <span class="k">def</span> <span class="m">ensure_same_currency!</span>(other)
+        <span class="k">raise</span> <span class="cls">ArgumentError</span>, <span class="s">"currency mismatch"</span> <span class="k">if</span> currency != other.currency
+      <span class="k">end</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+  <p>Второй Value Object — <code class="inl">BillingPeriod</code>. Он инкапсулирует правило «период длиной в месяц/год начинается тогда-то» и умеет вычислять остаток дней — это пригодится при возврате.</p>
+  <div class="code">
+    <div class="bar"><span class="fname">domain/value_objects/<b>billing_period.rb</b></span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">Subscriptions</span>
+  <span class="k">module</span> <span class="cls">Domain</span>
+    <span class="cls">BillingPeriod</span> = <span class="cls">Data</span>.define(<span class="sym">:starts_on</span>, <span class="sym">:ends_on</span>) <span class="k">do</span>
+      <span class="cls">UNITS</span> = { <span class="sym">monthly:</span> <span class="m">1</span>, <span class="sym">yearly:</span> <span class="m">12</span> }.freeze
+
+      <span class="k">def</span> <span class="m">self.starting</span>(on:, unit:)
+        months = <span class="cls">UNITS</span>.fetch(unit) { <span class="k">raise</span> <span class="cls">ArgumentError</span>, <span class="s">"unknown unit"</span> }
+        <span class="k">new</span>(<span class="sym">starts_on:</span> on, <span class="sym">ends_on:</span> on.next_month(months) - <span class="m">1</span>)
+      <span class="k">end</span>
+
+      <span class="k">def</span> <span class="m">covers?</span>(date) = (starts_on..ends_on).cover?(date)
+
+      <span class="k">def</span> <span class="m">total_days</span> = (ends_on - starts_on).to_i + <span class="m">1</span>
+
+      <span class="k">def</span> <span class="m">remaining_days_from</span>(date)
+        <span class="k">return</span> <span class="m">0</span> <span class="k">unless</span> covers?(date)
+        (ends_on - date).to_i
+      <span class="k">end</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+  <div class="callout bad">
+    <div class="lbl">Антипаттерн</div>
+    Хранить деньги как <code class="inl">float</code> в колонке и складывать вручную в контроллере. Округления поплывут, а правило «нельзя складывать евро с долларами» нигде не зафиксировано. Value Object делает невалидное состояние непредставимым.
+  </div>
+</section>
+
+<section id="entities">
+  <div class="tag">Тактический паттерн · 02</div>
+  <h2>Entities — объекты с идентичностью</h2>
+  <p>Entity, в отличие от Value Object, имеет <strong>идентификатор</strong> и живёт во времени: его атрибуты меняются, но это всё тот же объект. Подписка с <code class="inl">id=42</code> остаётся той же подпиской после паузы и возобновления. В нашем модуле главная сущность — <code class="inl">Subscription</code>, и она же является корнем агрегата, поэтому полный её код — в следующем разделе.</p>
+  <p>Важный момент: доменная Entity — это <strong>не</strong> ActiveRecord-модель. Это обычный Ruby-класс. Идентичность задаётся через <code class="inl">id</code>, равенство — по типу и идентификатору, а не по всем полям:</p>
+  <div class="code">
+    <div class="bar"><span class="fname">domain/entities/<b>base_entity.rb</b> (опционально)</span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">Subscriptions</span>
+  <span class="k">module</span> <span class="cls">Domain</span>
+    <span class="k">module</span> <span class="cls">Entity</span>
+      <span class="c"># равенство по идентичности, а не по значению</span>
+      <span class="k">def</span> <span class="m">==</span>(other)
+        other.is_a?(self.class) &amp;&amp; other.id == id &amp;&amp; !id.nil?
+      <span class="k">end</span>
+      <span class="k">alias_method</span> <span class="sym">:eql?</span>, <span class="sym">:==</span>
+
+      <span class="k">def</span> <span class="m">hash</span> = [self.class, id].hash
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+  <table>
+    <tr><th>Аспект</th><th>Value Object</th><th>Entity</th></tr>
+    <tr><td>Идентичность</td><td>Нет, равны по значению</td><td>Есть <code>id</code></td></tr>
+    <tr><td>Изменяемость</td><td>Immutable</td><td>Меняется во времени</td></tr>
+    <tr><td>Сравнение</td><td>По всем атрибутам</td><td>По идентификатору</td></tr>
+    <tr><td>Пример</td><td><code>Money</code>, <code>BillingPeriod</code></td><td><code>Subscription</code></td></tr>
+  </table>
+</section>
+
+<section id="aggregate">
+  <div class="tag">Тактический паттерн · 03</div>
+  <h2>Aggregate Root — страж инвариантов</h2>
+  <p>Агрегат — это кластер объектов, который изменяется как единое целое. У него один <strong>корень</strong> (Aggregate Root) — единственная точка входа. Внешний код не лезет внутрь напрямую, а вызывает методы корня, который <strong>гарантирует инварианты</strong>: правила, всегда истинные для агрегата (например, «нельзя поставить на паузу отменённую подписку»).</p>
+  <p>Состояние меняется только через осмысленные доменные методы — <code class="inl">activate</code>, <code class="inl">pause</code>, <code class="inl">cancel</code> — а не через сеттеры. Каждый метод проверяет, что переход допустим, и фиксирует доменное событие.</p>
+  <div class="code">
+    <div class="bar"><span class="fname">domain/entities/<b>subscription.rb</b></span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">Subscriptions</span>
+  <span class="k">module</span> <span class="cls">Domain</span>
+    <span class="k">class</span> <span class="cls">Subscription</span>
+      <span class="k">include</span> <span class="cls">Entity</span>
+
+      <span class="k">attr_reader</span> <span class="sym">:id</span>, <span class="sym">:customer_id</span>, <span class="sym">:plan</span>, <span class="sym">:price</span>,
+                  <span class="sym">:status</span>, <span class="sym">:period</span>, <span class="sym">:events</span>
+
+      <span class="k">def</span> <span class="m">initialize</span>(id:, customer_id:, plan:, price:, status:, period:)
+        <span class="vi">@id</span>          = id
+        <span class="vi">@customer_id</span> = customer_id
+        <span class="vi">@plan</span>        = plan
+        <span class="vi">@price</span>       = price        <span class="c"># Money</span>
+        <span class="vi">@status</span>      = status       <span class="c"># SubscriptionStatus</span>
+        <span class="vi">@period</span>      = period       <span class="c"># BillingPeriod</span>
+        <span class="vi">@events</span>      = []
+      <span class="k">end</span>
+
+      <span class="c"># --- Фабрика: создание нового агрегата ---</span>
+      <span class="k">def</span> <span class="m">self.subscribe</span>(customer_id:, plan:, price:, unit:, today:)
+        period = <span class="cls">BillingPeriod</span>.starting(<span class="sym">on:</span> today, <span class="sym">unit:</span> unit)
+        sub = <span class="k">new</span>(
+          <span class="sym">id:</span> <span class="k">nil</span>, <span class="sym">customer_id:</span> customer_id, <span class="sym">plan:</span> plan,
+          <span class="sym">price:</span> price, <span class="sym">status:</span> <span class="cls">SubscriptionStatus</span>.active, <span class="sym">period:</span> period
+        )
+        sub.record(<span class="cls">Events</span>::<span class="cls">SubscriptionActivated</span>.new(
+          <span class="sym">customer_id:</span> customer_id, <span class="sym">plan:</span> plan, <span class="sym">price:</span> price
+        ))
+        sub
+      <span class="k">end</span>
+
+      <span class="c"># --- Доменное поведение, а не сеттеры ---</span>
+      <span class="k">def</span> <span class="m">pause</span>(on:)
+        ensure!(<span class="sym">:active</span>, <span class="s">"можно ставить на паузу только активную"</span>)
+        <span class="vi">@status</span> = <span class="cls">SubscriptionStatus</span>.paused
+        record(<span class="cls">Events</span>::<span class="cls">SubscriptionPaused</span>.new(<span class="sym">subscription_id:</span> id, <span class="sym">on:</span> on))
+      <span class="k">end</span>
+
+      <span class="k">def</span> <span class="m">resume</span>
+        ensure!(<span class="sym">:paused</span>, <span class="s">"возобновить можно только из паузы"</span>)
+        <span class="vi">@status</span> = <span class="cls">SubscriptionStatus</span>.active
+      <span class="k">end</span>
+
+      <span class="c"># Отмена раньше срока → частичный возврат за неиспользованные дни</span>
+      <span class="k">def</span> <span class="m">cancel</span>(on:)
+        <span class="k">raise</span> <span class="cls">DomainError</span>, <span class="s">"уже отменена"</span> <span class="k">if</span> status.cancelled?
+        refund = refund_for(on)
+        <span class="vi">@status</span> = <span class="cls">SubscriptionStatus</span>.cancelled
+        record(<span class="cls">Events</span>::<span class="cls">SubscriptionCancelled</span>.new(
+          <span class="sym">subscription_id:</span> id, <span class="sym">on:</span> on, <span class="sym">refund:</span> refund
+        ))
+        refund
+      <span class="k">end</span>
+
+      <span class="k">def</span> <span class="m">record</span>(event) = events &lt;&lt; event
+      <span class="k">def</span> <span class="m">pull_events!</span> = events.dup.tap { events.clear }
+
+      <span class="k">private</span>
+
+      <span class="c"># Инвариант перехода состояний</span>
+      <span class="k">def</span> <span class="m">ensure!</span>(state, msg)
+        <span class="k">raise</span> <span class="cls">DomainError</span>, msg <span class="k">unless</span> status.public_send(<span class="s">"#{state}?"</span>)
+      <span class="k">end</span>
+
+      <span class="c"># Бизнес-правило возврата живёт в домене, не в контроллере</span>
+      <span class="k">def</span> <span class="m">refund_for</span>(date)
+        <span class="k">return</span> <span class="cls">Money</span>.new(<span class="sym">amount_cents:</span> <span class="m">0</span>, <span class="sym">currency:</span> price.currency) <span class="k">unless</span> period.covers?(date)
+        ratio = period.remaining_days_from(date).to_f / period.total_days
+        price * ratio
+      <span class="k">end</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+  <div class="callout good">
+    <div class="lbl">Что мы выиграли</div>
+    Всё знание о том, «что значит отменить подписку», собрано в одном месте. Любой код, который меняет подписку, обязан пройти через её методы — невозможно случайно перевести отменённую подписку в активную мимо проверок.
+  </div>
+</section>
+
+<section id="events">
+  <div class="tag">Тактический паттерн · 04</div>
+  <h2>Domain Events — факты, которые уже случились</h2>
+  <p>Доменное событие — неизменяемое сообщение о том, что в домене <strong>произошло</strong> что-то значимое. Имена в прошедшем времени: <code class="inl">SubscriptionActivated</code>, <code class="inl">SubscriptionCancelled</code>. Агрегат накапливает события, а слой приложения публикует их после успешного сохранения. Так другие части системы (письма, аналитика, биллинг) реагируют, не залезая внутрь модуля.</p>
+  <div class="code">
+    <div class="bar"><span class="fname">domain/events/<b>subscription_cancelled.rb</b></span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">Subscriptions</span>
+  <span class="k">module</span> <span class="cls">Domain</span>
+    <span class="k">module</span> <span class="cls">Events</span>
+      <span class="cls">SubscriptionCancelled</span> = <span class="cls">Data</span>.define(<span class="sym">:subscription_id</span>, <span class="sym">:on</span>, <span class="sym">:refund</span>) <span class="k">do</span>
+        <span class="k">def</span> <span class="m">event_name</span> = <span class="s">"subscriptions.cancelled"</span>
+        <span class="k">def</span> <span class="m">occurred_at</span> = on
+      <span class="k">end</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+  <p>Минимальная шина событий — поверх встроенного в Rails <code class="inl">ActiveSupport::Notifications</code>, без сторонних гемов:</p>
+  <div class="code">
+    <div class="bar"><span class="fname">infrastructure/<b>event_publisher.rb</b></span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">Subscriptions</span>
+  <span class="k">module</span> <span class="cls">Infrastructure</span>
+    <span class="k">module</span> <span class="cls">EventPublisher</span>
+      <span class="k">def</span> <span class="m">self.publish</span>(events)
+        <span class="cls">Array</span>(events).each <span class="k">do</span> |event|
+          <span class="cls">ActiveSupport</span>::<span class="cls">Notifications</span>.instrument(
+            event.event_name, <span class="sym">event:</span> event
+          )
+        <span class="k">end</span>
+      <span class="k">end</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+
+<span class="c"># Подписчик где-нибудь в config/initializers/</span>
+<span class="cls">ActiveSupport</span>::<span class="cls">Notifications</span>.subscribe(<span class="s">"subscriptions.cancelled"</span>) <span class="k">do</span> |*, payload|
+  event = payload[<span class="sym">:event</span>]
+  <span class="cls">RefundMailer</span>.confirmation(event.subscription_id, event.refund.to_s).deliver_later
+<span class="k">end</span></pre>
+  </div>
+</section>
+
+<section id="repository">
+  <div class="tag">Тактический паттерн · 05</div>
+  <h2>Repository — мост между доменом и базой</h2>
+  <p>Репозиторий прячет хранилище за коллекционным интерфейсом: <code class="inl">find</code>, <code class="inl">save</code>. Домен объявляет <strong>что</strong> ему нужно (интерфейс), инфраструктура решает <strong>как</strong> (ActiveRecord). Это и есть инверсия зависимостей, благодаря которой домен не зависит от Rails.</p>
+  <p>Сначала ActiveRecord-модель. Заметьте: она «тонкая» — это лишь таблица, никакой бизнес-логики. Её имя <code class="inl">SubscriptionRecord</code>, чтобы не путать с доменной <code class="inl">Subscription</code>.</p>
+  <div class="code">
+    <div class="bar"><span class="fname">infrastructure/records/<b>subscription_record.rb</b></span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">Subscriptions</span>
+  <span class="k">module</span> <span class="cls">Infrastructure</span>
+    <span class="k">class</span> <span class="cls">SubscriptionRecord</span> &lt; <span class="cls">ApplicationRecord</span>
+      self.table_name = <span class="s">"subscriptions"</span>
+      <span class="c"># колонки: customer_id, plan, price_cents, currency,</span>
+      <span class="c"># status, period_starts_on, period_ends_on</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+  <p>Реализация репозитория делает <strong>маппинг</strong> в обе стороны: строка БД → доменный агрегат и обратно. Это единственное место, где встречаются ActiveRecord и домен.</p>
+  <div class="code">
+    <div class="bar"><span class="fname">infrastructure/<b>ar_subscription_repository.rb</b></span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">Subscriptions</span>
+  <span class="k">module</span> <span class="cls">Infrastructure</span>
+    <span class="k">class</span> <span class="cls">ArSubscriptionRepository</span>
+      <span class="cls">NotFound</span> = <span class="cls">Class</span>.new(<span class="cls">StandardError</span>)
+
+      <span class="k">def</span> <span class="m">find</span>(id)
+        to_domain(<span class="cls">SubscriptionRecord</span>.find(id))
+      <span class="k">rescue</span> <span class="cls">ActiveRecord</span>::<span class="cls">RecordNotFound</span>
+        <span class="k">raise</span> <span class="cls">NotFound</span>, <span class="s">"subscription #{id}"</span>
+      <span class="k">end</span>
+
+      <span class="k">def</span> <span class="m">save</span>(sub)
+        record = sub.id ? <span class="cls">SubscriptionRecord</span>.find(sub.id) : <span class="cls">SubscriptionRecord</span>.new
+        record.update!(to_columns(sub))
+        <span class="c"># присваиваем сгенерированный id обратно в новый агрегат</span>
+        sub.instance_variable_set(<span class="sym">:@id</span>, record.id) <span class="k">if</span> sub.id.nil?
+        sub
+      <span class="k">end</span>
+
+      <span class="k">private</span>
+
+      <span class="c"># строка БД → доменный агрегат (реконструкция, без событий)</span>
+      <span class="k">def</span> <span class="m">to_domain</span>(r)
+        <span class="cls">Domain</span>::<span class="cls">Subscription</span>.new(
+          <span class="sym">id:</span> r.id, <span class="sym">customer_id:</span> r.customer_id, <span class="sym">plan:</span> r.plan,
+          <span class="sym">price:</span> <span class="cls">Domain</span>::<span class="cls">Money</span>.new(<span class="sym">amount_cents:</span> r.price_cents, <span class="sym">currency:</span> r.currency),
+          <span class="sym">status:</span> <span class="cls">Domain</span>::<span class="cls">SubscriptionStatus</span>.new(r.status),
+          <span class="sym">period:</span> <span class="cls">Domain</span>::<span class="cls">BillingPeriod</span>.new(
+            <span class="sym">starts_on:</span> r.period_starts_on, <span class="sym">ends_on:</span> r.period_ends_on
+          )
+        )
+      <span class="k">end</span>
+
+      <span class="c"># доменный агрегат → атрибуты колонок</span>
+      <span class="k">def</span> <span class="m">to_columns</span>(s)
+        {
+          <span class="sym">customer_id:</span> s.customer_id, <span class="sym">plan:</span> s.plan,
+          <span class="sym">price_cents:</span> s.price.amount_cents, <span class="sym">currency:</span> s.price.currency,
+          <span class="sym">status:</span> s.status.to_s,
+          <span class="sym">period_starts_on:</span> s.period.starts_on,
+          <span class="sym">period_ends_on:</span> s.period.ends_on
+        }
+      <span class="k">end</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+  <div class="callout">
+    <div class="lbl">Почему два класса для одной таблицы</div>
+    <code class="inl">SubscriptionRecord</code> — это форма хранения, <code class="inl">Domain::Subscription</code> — модель поведения. Их структура может расходиться: в домене <code class="inl">price</code> это Value Object, в базе — две колонки. Маппинг изолирует домен от схемы БД.
+  </div>
+</section>
+
+<section id="service">
+  <div class="tag">Тактический паттерн · 06</div>
+  <h2>Application Service — сценарий использования</h2>
+  <p>Доменные объекты не знают про транзакции и репозитории. Их связывает <strong>Application Service</strong> (use-case): он загружает агрегат, вызывает доменный метод, сохраняет результат в транзакции и публикует накопленные события. Один класс — один сценарий.</p>
+  <div class="code">
+    <div class="bar"><span class="fname">application/<b>cancel_subscription.rb</b></span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">Subscriptions</span>
+  <span class="k">module</span> <span class="cls">Application</span>
+    <span class="k">class</span> <span class="cls">CancelSubscription</span>
+      <span class="k">def</span> <span class="m">initialize</span>(repository:, publisher: <span class="cls">Infrastructure</span>::<span class="cls">EventPublisher</span>)
+        <span class="vi">@repository</span> = repository
+        <span class="vi">@publisher</span>  = publisher
+      <span class="k">end</span>
+
+      <span class="c"># возвращает сумму возврата (Money)</span>
+      <span class="k">def</span> <span class="m">call</span>(subscription_id:, on: <span class="cls">Date</span>.current)
+        refund = <span class="k">nil</span>
+
+        <span class="cls">ActiveRecord</span>::<span class="cls">Base</span>.transaction <span class="k">do</span>
+          subscription = <span class="vi">@repository</span>.find(subscription_id)
+          refund = subscription.cancel(<span class="sym">on:</span> on)   <span class="c"># вся логика — в домене</span>
+          <span class="vi">@repository</span>.save(subscription)
+          <span class="vi">@events</span> = subscription.pull_events!
+        <span class="k">end</span>
+
+        <span class="c"># публикуем ТОЛЬКО после успешного коммита</span>
+        <span class="vi">@publisher</span>.publish(<span class="vi">@events</span>)
+        refund
+      <span class="k">end</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+  <div class="callout good">
+    <div class="lbl">Порядок важен</div>
+    Сначала транзакция и коммит, потом публикация событий. Иначе письмо о возврате уйдёт, а транзакция откатится — клиент получит подтверждение несостоявшейся отмены.
+  </div>
+</section>
+
+<section id="flow">
+  <div class="tag">Сборка</div>
+  <h2>Полный сценарий: от контроллера до базы</h2>
+  <p>Соберём всё вместе. Запрос отмены подписки проходит сверху вниз и обратно. Заметьте: контроллер не знает ни о домене, ни о репозитории — он говорит только с фасадом.</p>
+  <div class="code">
+    <div class="bar"><span class="fname">путь запроса</span><button class="copy">копировать</button></div>
+<pre><span class="c"># 1. Контроллер — тонкий, знает только про фасад модуля</span>
+<span class="k">class</span> <span class="cls">SubscriptionsController</span> &lt; <span class="cls">ApplicationController</span>
+  <span class="k">def</span> <span class="m">destroy</span>
+    refund = <span class="cls">Subscriptions</span>.cancel(<span class="sym">subscription_id:</span> params[<span class="sym">:id</span>])
+    render <span class="sym">json:</span> { <span class="sym">refund:</span> refund.to_s }
+  <span class="k">rescue</span> <span class="cls">Subscriptions</span>::<span class="cls">Domain</span>::<span class="cls">DomainError</span> =&gt; e
+    render <span class="sym">json:</span> { <span class="sym">error:</span> e.message }, <span class="sym">status:</span> <span class="sym">:unprocessable_entity</span>
+  <span class="k">end</span>
+<span class="k">end</span>
+
+<span class="c"># 2. Фасад собирает зависимости и делегирует use-case</span>
+<span class="c"># 3. CancelSubscription грузит агрегат через репозиторий</span>
+<span class="c"># 4. subscription.cancel(on:) применяет бизнес-правила в домене</span>
+<span class="c"># 5. Репозиторий мапит агрегат обратно в строку и сохраняет</span>
+<span class="c"># 6. После коммита публикуются события → письмо о возврате</span></pre>
+  </div>
+</section>
+
+<section id="boundary">
+  <div class="tag">Граница контекста</div>
+  <h2>Публичный API модуля — единственная дверь</h2>
+  <p>Снаружи модуль должен выглядеть как чёрный ящик с парой методов. Все внутренние классы — детали реализации. Фасад собирает зависимости (composition root для модуля) и предоставляет осмысленный интерфейс.</p>
+  <div class="code">
+    <div class="bar"><span class="fname"><b>subscriptions.rb</b> — фасад</span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">Subscriptions</span>
+  <span class="k">module_function</span>
+
+  <span class="k">def</span> <span class="m">subscribe</span>(customer_id:, plan:, price_cents:, unit:)
+    price = <span class="cls">Domain</span>::<span class="cls">Money</span>.new(<span class="sym">amount_cents:</span> price_cents)
+    <span class="cls">Application</span>::<span class="cls">ActivateSubscription</span>.new(<span class="sym">repository:</span> repository)
+      .call(<span class="sym">customer_id:</span> customer_id, <span class="sym">plan:</span> plan, <span class="sym">price:</span> price, <span class="sym">unit:</span> unit)
+  <span class="k">end</span>
+
+  <span class="k">def</span> <span class="m">cancel</span>(subscription_id:, on: <span class="cls">Date</span>.current)
+    <span class="cls">Application</span>::<span class="cls">CancelSubscription</span>.new(<span class="sym">repository:</span> repository)
+      .call(<span class="sym">subscription_id:</span> subscription_id, <span class="sym">on:</span> on)
+  <span class="k">end</span>
+
+  <span class="k">def</span> <span class="m">repository</span> = <span class="cls">Infrastructure</span>::<span class="cls">ArSubscriptionRepository</span>.new
+  <span class="k">private_class_method</span> <span class="sym">:repository</span>
+<span class="k">end</span></pre>
+  </div>
+  <div class="callout">
+    <div class="lbl">Граница, которую можно усилить</div>
+    Хотите запретить остальному приложению обращаться к <code class="inl">Subscriptions::Domain</code> напрямую — добавьте <strong>Packwerk</strong> (это инструмент Shopify, но не зависимость кода). Без него граница держится дисциплиной команды и код-ревью: правило «только через фасад».
+  </div>
+</section>
+
+<section id="testing">
+  <div class="tag">Качество</div>
+  <h2>Тестирование: домен без базы данных</h2>
+  <p>Главная награда за разделение слоёв — доменные правила тестируются как чистые Ruby-объекты, мгновенно, без подключения к БД и без фабрик ActiveRecord.</p>
+  <div class="code">
+    <div class="bar"><span class="fname">spec/subscriptions/<b>subscription_spec.rb</b></span><button class="copy">копировать</button></div>
+<pre><span class="cls">RSpec</span>.describe <span class="cls">Subscriptions</span>::<span class="cls">Domain</span>::<span class="cls">Subscription</span> <span class="k">do</span>
+  <span class="k">def</span> <span class="m">build_active</span>(price_cents: <span class="m">3000</span>)
+    described_class.subscribe(
+      <span class="sym">customer_id:</span> <span class="m">1</span>, <span class="sym">plan:</span> <span class="s">"pro"</span>,
+      <span class="sym">price:</span> <span class="cls">Subscriptions</span>::<span class="cls">Domain</span>::<span class="cls">Money</span>.new(<span class="sym">amount_cents:</span> price_cents),
+      <span class="sym">unit:</span> <span class="sym">:monthly</span>, <span class="sym">today:</span> <span class="cls">Date</span>.new(<span class="m">2026</span>, <span class="m">1</span>, <span class="m">1</span>)
+    )
+  <span class="k">end</span>
+
+  <span class="m">it</span> <span class="s">"запрещает паузу для отменённой подписки"</span> <span class="k">do</span>
+    sub = build_active
+    sub.cancel(<span class="sym">on:</span> <span class="cls">Date</span>.new(<span class="m">2026</span>, <span class="m">1</span>, <span class="m">10</span>))
+    expect { sub.pause(<span class="sym">on:</span> <span class="cls">Date</span>.current) }
+      .to raise_error(<span class="cls">Subscriptions</span>::<span class="cls">Domain</span>::<span class="cls">DomainError</span>)
+  <span class="k">end</span>
+
+  <span class="m">it</span> <span class="s">"считает частичный возврат за неиспользованные дни"</span> <span class="k">do</span>
+    sub = build_active(<span class="sym">price_cents:</span> <span class="m">3100</span>)        <span class="c"># 31 день в январе</span>
+    refund = sub.cancel(<span class="sym">on:</span> <span class="cls">Date</span>.new(<span class="m">2026</span>, <span class="m">1</span>, <span class="m">21</span>))  <span class="c"># 10 дней остаётся</span>
+    expect(refund.amount_cents).to eq(<span class="m">1000</span>)
+  <span class="k">end</span>
+
+  <span class="m">it</span> <span class="s">"фиксирует событие при активации"</span> <span class="k">do</span>
+    sub = build_active
+    expect(sub.events.map(&amp;<span class="sym">:event_name</span>)).to include(<span class="s">"subscriptions.activated"</span>)
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+  <p>Application Service тестируют с <strong>in-memory репозиторием</strong> — тот же интерфейс, хранение в хэше. Интеграционные тесты против настоящего <code class="inl">ArSubscriptionRepository</code> и базы пишут отдельно и реже.</p>
+  <div class="code">
+    <div class="bar"><span class="fname">spec/support/<b>in_memory_repository.rb</b></span><button class="copy">копировать</button></div>
+<pre><span class="k">class</span> <span class="cls">InMemorySubscriptionRepository</span>
+  <span class="k">def</span> <span class="m">initialize</span> = (<span class="vi">@store</span> = {}; <span class="vi">@seq</span> = <span class="m">0</span>)
+
+  <span class="k">def</span> <span class="m">find</span>(id) = <span class="vi">@store</span>.fetch(id)
+
+  <span class="k">def</span> <span class="m">save</span>(sub)
+    id = sub.id || (<span class="vi">@seq</span> += <span class="m">1</span>)
+    sub.instance_variable_set(<span class="sym">:@id</span>, id)
+    <span class="vi">@store</span>[id] = sub
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+</section>
+
+<section id="pitfalls">
+  <div class="tag">Итог</div>
+  <h2>Грабли, на которые легко наступить</h2>
+  <table>
+    <tr><th>Грабли</th><th>Как правильно</th></tr>
+    <tr><td>Анемичная модель: домен только с геттерами, логика в сервисах</td><td>Поведение живёт в агрегате (<code>cancel</code>, <code>pause</code>), сервис лишь оркестрирует</td></tr>
+    <tr><td>ActiveRecord протёк в домен через ассоциации и скоупы</td><td>Домен — чистый Ruby; AR только в <code>infrastructure/</code></td></tr>
+    <tr><td>Слишком большой агрегат, тянущий полбазы</td><td>Агрегат маленький; ссылки на другие агрегаты — по <code>id</code>, не по объекту</td></tr>
+    <tr><td>Колбэки ActiveRecord с бизнес-логикой</td><td>Логика в доменных методах, побочные эффекты — через события</td></tr>
+    <tr><td>События публикуются до коммита транзакции</td><td>Сначала <code>save</code> + commit, потом <code>publish</code></td></tr>
+    <tr><td>DDD в каждом CRUD-модуле</td><td>DDD — только для сложных контекстов с богатыми правилами; CRUD оставьте на «толстой модели»</td></tr>
+  </table>
+  <div class="callout good">
+    <div class="lbl">Резюме</div>
+    DDD на Rails — это не борьба с фреймворком, а дисциплина границ. Чистый домен на pure Ruby выражает правила, репозиторий изолирует базу, application service оркеструет, фасад прячет внутренности. Никаких внешних гемов: <code class="inl">Data.define</code>, <code class="inl">ActiveSupport::Notifications</code> и Zeitwerk дают всё необходимое.
+  </div>
+  <p>Применяйте это выборочно. Подписки, биллинг, расчёт цен, рабочие процессы заказа — стоят слоёв. Справочник стран или CRUD-админка — нет. Сила DDD в том, чтобы тратить сложность там, где она окупается.</p>
+</section>
+
+<footer>
+  Subscriptions module · Pure Ruby + Rails · DDD tactical patterns · нажмите «копировать» на любом блоке
+</footer>
+</main>
+</div>
+
+<script>
+// copy buttons
+document.querySelectorAll('.code .copy').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const pre=btn.closest('.code').querySelector('pre');
+    navigator.clipboard.writeText(pre.innerText).then(()=>{
+      const t=btn.textContent;btn.textContent='скопировано ✓';
+      setTimeout(()=>btn.textContent=t,1400);
+    });
+  });
+});
+// scroll spy
+const links=[...document.querySelectorAll('#nav a')];
+const map={};links.forEach(l=>map[l.getAttribute('href').slice(1)]=l);
+const obs=new IntersectionObserver((es)=>{
+  es.forEach(e=>{
+    if(e.isIntersecting){
+      links.forEach(l=>l.classList.remove('active'));
+      const a=map[e.target.id];if(a)a.classList.add('active');
+    }
+  });
+},{rootMargin:'-15% 0px -75% 0px'});
+document.querySelectorAll('section,header').forEach(s=>obs.observe(s));
+// layer pulse
+document.querySelectorAll('.layer').forEach(l=>{
+  l.addEventListener('click',()=>{l.style.background='var(--paper-2)';setTimeout(()=>l.style.background='',300);});
+});
+</script>
+</body>
+</html>
