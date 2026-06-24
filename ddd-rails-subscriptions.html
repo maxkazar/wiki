@@ -153,13 +153,14 @@ footer{padding:50px 0 0;font-family:'JetBrains Mono',monospace;font-size:12px;co
   <a href="#aggregate"><span class="n">06</span>Aggregate Root</a>
   <a href="#events"><span class="n">07</span>Domain Events</a>
   <a href="#repository"><span class="n">08</span>Repository</a>
-  <a href="#service"><span class="n">09</span>Domain / App Services</a>
+  <a href="#reads"><span class="n">09</span>Чтение из домена</a>
+  <a href="#service"><span class="n">10</span>Domain / App Services</a>
 
   <div class="group">Сборка</div>
-  <a href="#flow"><span class="n">10</span>Полный сценарий</a>
-  <a href="#boundary"><span class="n">11</span>Публичный API модуля</a>
-  <a href="#testing"><span class="n">12</span>Тестирование</a>
-  <a href="#pitfalls"><span class="n">13</span>Грабли и итог</a>
+  <a href="#flow"><span class="n">11</span>Полный сценарий</a>
+  <a href="#boundary"><span class="n">12</span>Публичный API модуля</a>
+  <a href="#testing"><span class="n">13</span>Тестирование</a>
+  <a href="#pitfalls"><span class="n">14</span>Грабли и итог</a>
 </nav>
 
 <main>
@@ -575,6 +576,109 @@ footer{padding:50px 0 0;font-family:'JetBrains Mono',monospace;font-size:12px;co
   </div>
 </section>
 
+<section id="reads">
+  <div class="tag">Чтение · важная развилка</div>
+  <h2>Как читать из домена: списки, фильтры, экраны</h2>
+  <p>До сих пор репозиторий умел только <code class="inl">find(id)</code> и <code class="inl">save</code> — этого достаточно, чтобы <strong>изменять</strong> подписку. Но как вывести список всех подписок клиента или таблицу для админки? Здесь новички совершают типичную ошибку: добавляют в репозиторий <code class="inl">all</code> и возвращают массив доменных агрегатов.</p>
+  <div class="callout bad">
+    <div class="lbl">Почему «вернуть список агрегатов» — плохо</div>
+    Агрегат — тяжёлый объект, защищённый инвариантами, предназначенный для <em>изменения</em>. Чтобы показать таблицу из 200 строк, вы реконструируете 200 агрегатов со всеми Value Objects и событиями — впустую. Вдобавок шаблону для отображения часто нужны данные из других контекстов (имя клиента, название тарифа), которых в агрегате нет, — и начинается протечка границ.
+  </div>
+  <p>Решение — <strong>разделить команды и запросы</strong> (CQS, прагматичный родственник CQRS):</p>
+  <table>
+    <tr><th></th><th>Команда (запись)</th><th>Запрос (чтение)</th></tr>
+    <tr><td>Цель</td><td>Изменить состояние</td><td>Показать данные</td></tr>
+    <tr><td>Через что</td><td><code>Repository</code> → агрегат</td><td><code>Query</code> → плоский DTO</td></tr>
+    <tr><td>Инварианты</td><td>Защищены агрегатом</td><td>Не нужны — read-only</td></tr>
+    <tr><td>Форма данных</td><td><code>Domain::Subscription</code></td><td><code>SubscriptionListItem</code> (struct)</td></tr>
+    <tr><td>Пример</td><td><code>cancel(id:)</code></td><td><code>list_for_customer(id)</code></td></tr>
+  </table>
+  <p>Сторона чтения не обязана уважать богатую модель: она может бить прямо в базу, джойнить таблицы и отдавать ровно те поля, что нужны экрану. Это отдельный объект — <strong>Query</strong> (или read-model), который живёт в инфраструктуре и возвращает простые DTO, а не агрегаты.</p>
+  <h3>DTO для строки списка</h3>
+  <p>Плоский, неизменяемый объект чтения — только данные для отображения, никакого поведения:</p>
+  <div class="code">
+    <div class="bar"><span class="fname">application/read_models/<b>subscription_list_item.rb</b></span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">Subscriptions</span>
+  <span class="k">module</span> <span class="cls">ReadModels</span>
+    <span class="c"># DTO для экрана: ровно то, что нужно таблице, и ничего лишнего</span>
+    <span class="cls">SubscriptionListItem</span> = <span class="cls">Data</span>.define(
+      <span class="sym">:id</span>, <span class="sym">:plan</span>, <span class="sym">:status</span>, <span class="sym">:price</span>, <span class="sym">:renews_on</span>
+    ) <span class="k">do</span>
+      <span class="k">def</span> <span class="m">active?</span> = status == <span class="s">"active"</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+  <h3>Query-объект</h3>
+  <p>Здесь разрешено пользоваться всей мощью ActiveRecord: <code class="inl">where</code>, <code class="inl">order</code>, джойны, пагинация, <code class="inl">pluck</code>. Цель — отдать готовые DTO быстро и без реконструкции агрегатов.</p>
+  <div class="code">
+    <div class="bar"><span class="fname">infrastructure/queries/<b>subscription_queries.rb</b></span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">Subscriptions</span>
+  <span class="k">module</span> <span class="cls">Infrastructure</span>
+    <span class="k">class</span> <span class="cls">SubscriptionQueries</span>
+      <span class="c"># список подписок клиента — read-only, без агрегатов</span>
+      <span class="k">def</span> <span class="m">list_for_customer</span>(customer_id, status: <span class="k">nil</span>)
+        scope = <span class="cls">SubscriptionRecord</span>.where(<span class="sym">customer_id:</span> customer_id)
+        scope = scope.where(<span class="sym">status:</span> status) <span class="k">if</span> status
+        scope.order(<span class="sym">period_starts_on:</span> <span class="sym">:desc</span>).map { |r| to_item(r) }
+      <span class="k">end</span>
+
+      <span class="c"># пагинированный список для админки</span>
+      <span class="k">def</span> <span class="m">page</span>(page: <span class="m">1</span>, per: <span class="m">25</span>)
+        <span class="cls">SubscriptionRecord</span>
+          .order(<span class="sym">id:</span> <span class="sym">:desc</span>).limit(per).offset((page - <span class="m">1</span>) * per)
+          .map { |r| to_item(r) }
+      <span class="k">end</span>
+
+      <span class="k">private</span>
+
+      <span class="k">def</span> <span class="m">to_item</span>(r)
+        <span class="cls">ReadModels</span>::<span class="cls">SubscriptionListItem</span>.new(
+          <span class="sym">id:</span> r.id, <span class="sym">plan:</span> r.plan, <span class="sym">status:</span> r.status,
+          <span class="sym">price:</span> <span class="s">format</span>(<span class="s">"%.2f %s"</span>, r.price_cents / <span class="m">100.0</span>, r.currency),
+          <span class="sym">renews_on:</span> r.period_ends_on
+        )
+      <span class="k">end</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+  <div class="callout good">
+    <div class="lbl">Нужны поля из других контекстов?</div>
+    Если таблице нужно имя клиента или красивое название тарифа, query-объект может сделать <code class="inl">joins</code> к таблицам других модулей <em>на стороне чтения</em> и положить результат в DTO. Это не нарушает границы домена, потому что запись по-прежнему идёт только через агрегат и фасад — протекает лишь read-only проекция.
+  </div>
+  <h3>Открываем чтение через фасад</h3>
+  <p>Query доступен снаружи так же, как команды — через тот же публичный API модуля. Контроллер списка остаётся тонким:</p>
+  <div class="code">
+    <div class="bar"><span class="fname"><b>subscriptions.rb</b> — добавляем чтение</span><button class="copy">копировать</button></div>
+<pre><span class="k">module</span> <span class="cls">Subscriptions</span>
+  <span class="k">module_function</span>
+
+  <span class="c"># --- запросы (чтение) ---</span>
+  <span class="k">def</span> <span class="m">list_for_customer</span>(customer_id, status: <span class="k">nil</span>)
+    queries.list_for_customer(customer_id, <span class="sym">status:</span> status)
+  <span class="k">end</span>
+
+  <span class="k">def</span> <span class="m">queries</span> = <span class="cls">Infrastructure</span>::<span class="cls">SubscriptionQueries</span>.new
+  <span class="k">private_class_method</span> <span class="sym">:queries</span>
+<span class="k">end</span>
+
+<span class="c"># контроллер — тонкий, получает готовые DTO</span>
+<span class="k">class</span> <span class="cls">SubscriptionsController</span> &lt; <span class="cls">ApplicationController</span>
+  <span class="k">def</span> <span class="m">index</span>
+    <span class="vi">@subscriptions</span> = <span class="cls">Subscriptions</span>.list_for_customer(
+      current_user.id, <span class="sym">status:</span> params[<span class="sym">:status</span>]
+    )
+    <span class="c"># во вью: @subscriptions.each { |s| s.plan, s.price, s.status ... }</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre>
+  </div>
+  <div class="callout">
+    <div class="lbl">Когда чтение можно упростить</div>
+    Если приложение небольшое и проекции совпадают со схемой, отдельный DTO-слой избыточен — можно вернуть из query голые хэши через <code class="inl">pluck</code> или даже сами <code class="inl">SubscriptionRecord</code> в режиме read-only. Главное правило неизменно: <strong>чтение не проходит через агрегат, а запись — только через него.</strong> Полноценный CQRS с отдельной БД для чтения нужен лишь при высокой нагрузке; здесь достаточно разделения на уровне объектов.
+  </div>
+</section>
+
 <section id="service">
   <div class="tag">Тактический паттерн · 06</div>
   <h2>Application Service — сценарий использования</h2>
@@ -729,6 +833,7 @@ footer{padding:50px 0 0;font-family:'JetBrains Mono',monospace;font-size:12px;co
     <tr><td>Слишком большой агрегат, тянущий полбазы</td><td>Агрегат маленький; ссылки на другие агрегаты — по <code>id</code>, не по объекту</td></tr>
     <tr><td>Колбэки ActiveRecord с бизнес-логикой</td><td>Логика в доменных методах, побочные эффекты — через события</td></tr>
     <tr><td>События публикуются до коммита транзакции</td><td>Сначала <code>save</code> + commit, потом <code>publish</code></td></tr>
+    <tr><td>Списки строятся из доменных агрегатов через репозиторий</td><td>Чтение — через отдельный Query → плоские DTO, мимо агрегата</td></tr>
     <tr><td>DDD в каждом CRUD-модуле</td><td>DDD — только для сложных контекстов с богатыми правилами; CRUD оставьте на «толстой модели»</td></tr>
   </table>
   <div class="callout good">
