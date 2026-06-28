@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Лессон 02 — Агрегат и корень агрегата</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+
+<header class="masthead">
+  <p class="eyebrow">Лессон 02 · DDD в Rails · Tactical-паттерны</p>
+  <h1>Агрегат и корень агрегата</h1>
+  <p class="subtitle">Модуль с одной дверью: как собрать Entity и Value Objects в единицу, которая сама охраняет свои правила — и почему снаружи у неё ровно одна точка входа.</p>
+</header>
+
+<p>В <a href="0001-value-object.html">Лессоне 01</a> мы собрали мелкий кирпич — <span class="term">Value Object</span>. Теперь — несущая конструкция твоего <b>командного стандарта</b>: <span class="term">Aggregate</span> <span class="en">(агрегат)</span>. Это и есть «модуль с одной точкой входа», ради которого ты учишь DDD. Tangible win этого лессона: <b>научиться находить корень агрегата и проводить через него все изменения, чтобы инварианты нельзя было нарушить</b>.</p>
+
+<h2>Идея за одну минуту</h2>
+
+<p>Эрик Эванс: <em>«Агрегат — это кластер связанных объектов, который мы рассматриваем как единое целое с точки зрения изменения данных».</em><sup><a href="#src">1</a></sup> Три слова здесь несущие:</p>
+
+<ul>
+  <li><span class="term">Aggregate</span> — группа Entity и Value Objects, которые меняются <b>вместе, в одной транзакции</b>. Это <b>граница консистентности</b>.</li>
+  <li><span class="term">Aggregate Root</span> <span class="en">(корень)</span> — главная Entity группы и <b>единственная дверь</b>. Снаружи можно держать ссылку только на корень (по его id); внутренние объекты спрятаны.<sup><a href="#src">1</a></sup></li>
+  <li><span class="term">Invariant</span> <span class="en">(инвариант)</span> — правило домена, которое всегда должно быть истинно. Корень проверяет его при каждой команде: <em>приведёт ли изменение к валидному состоянию?</em> Если нет — отклоняет целиком.<sup><a href="#src">1</a></sup></li>
+</ul>
+
+<div class="insight">
+  <span class="callout-label">Метафора двери</span>
+  Агрегат — это здание с одной проходной (корень). Хочешь что-то изменить внутри — идёшь через проходную, где висят правила (инварианты). Нельзя залезть в окно и переставить мебель в обход охраны. В коде «залезть в окно» = дёрнуть внутреннюю Entity напрямую.
+</div>
+
+<h2>Наш агрегат: Топология ИС</h2>
+
+<p>Топология — граф: <span class="term">Узел</span> <span class="en">(Node)</span> и <span class="term">Связь</span> <span class="en">(Link)</span> между узлами. Что обязано быть истинным <em>всегда</em> — это инварианты графа:</p>
+
+<ul>
+  <li><b>Нет висячих связей:</b> Link соединяет только узлы, которые есть в этой топологии.</li>
+  <li><b>Нет связи узла с самим собой</b> (по правилам нашего домена).</li>
+  <li><b>Нельзя удалить узел</b>, пока на него ссылаются связи.</li>
+</ul>
+
+<p>Кто гарантирует эти правила? Если «каждый контроллер сам» — гарантий нет. В DDD их гарантирует <b>корень</b> — <code>Topology</code>.</p>
+
+<p class="code-label">⟂ Было: has_many наружу, инварианты держать некому</p>
+<pre><code><span class="bad"># Топология как «мешок» AR-моделей с открытыми ассоциациями</span>
+class Topology < ApplicationRecord
+  has_many :nodes
+  has_many :links
+end
+
+<span class="bad"># Контроллер лезет внутрь напрямую — «через окно»:</span>
+topology.links.create!(from_id: 7, to_id: 999)
+<span class="bad"># to_id=999 нет в этой топологии → висячая связь.</span>
+<span class="bad"># Граф порвался. Никто не проверил инвариант.</span></code></pre>
+
+<p>Соберём <code>Topology</code> как <b>корень агрегата</b>: единственная дверь с методами-командами, которые проверяют инварианты <em>до</em> изменения.</p>
+
+<p class="code-label">✓ Стало: одна дверь, инварианты внутри корня</p>
+<pre><code><span class="good"># app/domain/topology/topology.rb</span>
+module Topology
+  class Graph < ApplicationRecord
+    self.table_name = "topologies"
+    has_many :nodes, dependent: :destroy   <span class="good"># внутри агрегата — ок</span>
+    has_many :links, dependent: :destroy
+
+    <span class="good"># КОМАНДА: добавить связь. Дверь, а не сеттер.</span>
+    def connect(from_node, to_node)
+      ensure_inside!(from_node, to_node)        <span class="good"># инвариант 1</span>
+      raise SelfLink if from_node == to_node     <span class="good"># инвариант 2</span>
+      links.create!(from: from_node, to: to_node)
+    end
+
+    def remove_node(node)
+      raise NodeInUse if links.exists?(          <span class="good"># инвариант 3</span>
+        "from_id = :id OR to_id = :id", id: node.id)
+      node.destroy!
+    end
+
+    private
+
+    def ensure_inside!(*ns)
+      raise NodeOutside unless ns.all? { _1.topology_id == id }
+    end
+  end
+end
+
+<span class="good"># Контроллер теперь говорит с корнем, а не с потрохами:</span>
+topology.connect(node_a, node_b)   <span class="good"># инварианты гарантированы</span></code></pre>
+
+<div class="note">
+  <span class="callout-label">Корень как транзакция</span>
+  Команда корня = одна транзакция, оставляющая агрегат в валидном состоянии. <code>connect</code> либо создаёт корректную связь, либо падает — промежуточного «полу-битого» графа не бывает. Это и есть «граница консистентности».
+</div>
+
+<h2>Граница агрегата: ссылки по id, не по ассоциации</h2>
+
+<p>А что с <span class="term">Находкой</span> <span class="en">(Finding)</span> — уязвимостью, найденной на узле? Соблазн — <code>belongs_to :node</code>. Но Finding и Topology — <b>разные агрегаты</b>. Источник прямо предупреждает: Rails-ассоциации <code>belongs_to</code>/<code>has_many</code> <b>через границу агрегата</b> провоцируют лишнюю связанность и подгрузку чужого агрегата.<sup><a href="#src">1</a></sup></p>
+
+<div class="compare">
+  <div class="col-bad">
+    <div class="h">✗ Через границу — ассоциацией</div>
+    <code>class Finding &lt; AR<br>&nbsp;&nbsp;belongs_to :node<br>end</code>
+    <p style="margin:.5rem 0 0;font-size:.85rem">Тянет за собой весь агрегат топологии, связывает жизненные циклы.</p>
+  </div>
+  <div class="col-good">
+    <div class="h">✓ Через границу — по id</div>
+    <code>class Finding &lt; AR<br>&nbsp;&nbsp;# node_id:integer<br>&nbsp;&nbsp;# просто идентичность<br>end</code>
+    <p style="margin:.5rem 0 0;font-size:.85rem">Finding ссылается на узел по id. Агрегаты независимы.</p>
+  </div>
+</div>
+
+<p><b>Правило:</b> внутри агрегата — обычные ассоциации; <b>через границу — только id корня</b> другого агрегата.</p>
+
+<div class="warn">
+  <span class="callout-label">Держи агрегат маленьким</span>
+  «Правильный размер агрегата — это нужный размер границы консистентности».<sup><a href="#src">1</a></sup> Не заси́сывай в один агрегат всё подряд: чем он больше, тем длиннее транзакции и блокировки. Если два набора данных не обязаны меняться <em>вместе</em> в одной транзакции — это два агрегата.
+</div>
+
+<h2>Проверь себя</h2>
+<p>По памяти, не подглядывая. Усилие припоминания — то, что переводит знание в долгую память.</p>
+
+<div class="quiz" data-quiz>
+  <p class="q">Контроллеру нужно добавить связь в граф. Как правильно?</p>
+  <button data-correct>Вызвать команду корня topology.connect</button>
+  <button>Создать Link напрямую через links.create</button>
+  <button>Записать from_id и to_id в таблицу</button>
+  <p class="explain" hidden><b>Через команду корня.</b> Только корень проверяет инварианты (оба узла внутри, нет петли). Прямое создание Link — это «влезть в окно» в обход охраны: инварианты никто не гарантирует.</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="quiz" data-quiz>
+  <p class="q">Finding (уязвимость) ссылается на Node из агрегата топологии. Как?</p>
+  <button data-correct>По идентичности: колонка node_id</button>
+  <button>Ассоциацией belongs_to node всегда</button>
+  <button>Копией всех полей узла внутрь</button>
+  <p class="explain" hidden><b>По идентичности (node_id).</b> Finding и Topology — разные агрегаты. Через границу держим только ссылку-id на корень/сущность другого агрегата, а не AR-ассоциацию, которая тянет и связывает чужой агрегат целиком.</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="quiz" data-quiz>
+  <p class="q">Что в первую очередь определяет границу агрегата?</p>
+  <button data-correct>Что обязано меняться в одной транзакции</button>
+  <button>Что удобно показать на одном экране</button>
+  <button>Что лежит в одной таблице базы</button>
+  <p class="explain" hidden><b>Граница консистентности.</b> Агрегат — это набор объектов, которые должны оставаться согласованными вместе, в одной транзакции. Не экран, не таблица — а инварианты, которые надо удерживать атомарно. Поэтому агрегаты держат маленькими.</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="review">
+  <span class="callout-label">Как защитить на ревью</span>
+  Два вопроса к PR. <b>(1)</b> <em>«Где здесь инвариант и кто его охраняет?»</em> — если изменение внутреннего объекта идёт в обход корня (<code>topology.links.create!</code> из контроллера), проси завести команду на корне. <b>(2)</b> <em>«Эта ассоциация пересекает границу агрегата?»</em> — если <code>belongs_to</code> тянет другой агрегат, предлагай ссылку по <code>id</code>. Формула для команды: <b>«у каждого агрегата одна дверь; через границу — только id»</b>.
+</div>
+
+<div class="source" id="src">
+  <span class="callout-label">Первоисточник — прочитай это</span>
+  <a href="https://www.visuality.pl/posts/aggregate-ddd-in-ruby-on-rails">Aggregate — DDD in Ruby on Rails (Visuality)</a>.
+  Наш основной источник по миссии: агрегат как граница консистентности, доступ только через корень, ловушки <code>belongs_to</code>/<code>has_many</code> и размер агрегата — всё на Ruby. 12 минут.
+</div>
+
+<p class="ask">Застрял на том, где именно провести границу в твоей системе (Scan и Finding — один агрегат или два? куда отнести интерфейсы узла?) — спроси меня в чате. Разберём на твоих реальных сущностях, это самая ценная часть.</p>
+
+<div class="footer">
+  <b>Курс:</b> DDD для модулей в Rails ·
+  <b>Назад ←</b> <a href="0001-value-object.html">Лессон 01: Value Object</a> ·
+  <b>Дальше →</b> Лессон 03: <i>Доменный сервис vs толстая модель vs сервис-объект</i> — где живёт логика, которая не помещается ни в один агрегат.
+  <br><br>
+  <b>Связано:</b> <a href="../MISSION.md">Миссия</a> · <a href="../RESOURCES.md">Ресурсы</a> · <a href="../reference/value-object.html">Шпаргалка: Value Object</a>
+</div>
+
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

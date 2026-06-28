@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Лессон 05 — Ограниченный контекст</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+<style>
+  .ctxmap { display:grid; grid-template-columns:repeat(3,1fr); gap:0.8rem; margin:1.4rem 0; }
+  .ctx { border:1px solid var(--rule); border-top:4px solid var(--accent); border-radius:8px; padding:0.9rem; font-size:0.85rem; }
+  .ctx h4 { margin:0 0 0.5rem; font-size:0.95rem; }
+  .ctx .asset { font-family:"SF Mono",ui-monospace,Menlo,monospace; font-size:0.74rem; color:var(--ink-soft); }
+  .idbar { text-align:center; font-family:"SF Mono",ui-monospace,Menlo,monospace; font-size:0.78rem; color:var(--accent); margin:0.4rem 0 0; }
+  @media (max-width:34rem){ .ctxmap{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <p class="eyebrow">Лессон 05 · DDD в Rails · Стратегический уровень</p>
+  <h1>Ограниченный контекст</h1>
+  <p class="subtitle">Сам модуль. Где провести границу между Топологией, Уязвимостями и Документацией — и почему «Актив» в каждой из них это <em>разная</em> модель, а не дублирование.</p>
+</header>
+
+<p>До сих пор мы делали кирпичи: <a href="0001-value-object.html">Value Object</a>, <a href="0002-aggregate.html">Агрегат</a>, <a href="0003-domain-service.html">Доменный сервис</a>. Теперь — стены. <span class="term">Ограниченный контекст</span> <span class="en">(Bounded Context)</span> и есть тот <b>модуль</b>, ради которого ты учишь DDD. Tangible win: <b>научиться проводить границу модуля по смыслу, а не по папкам</b>.</p>
+
+<h2>Идея за одну минуту</h2>
+
+<p>Мартин Фаулер: модель работает как <b>единый язык</b> общения, поэтому <em>«нужна другая модель, когда меняется язык»</em>.<sup><a href="#src1">1</a></sup> Граница контекста проходит там, где <b>смысл слова сдвигается</b>. И ключевое признание DDD: <em>«полная унификация модели предметной области для большой системы не осуществима и не окупается»</em>.<sup><a href="#src1">1</a></sup></p>
+
+<div class="insight">
+  <span class="callout-label">Главная мысль</span>
+  Ограниченный контекст — это граница, <b>внутри которой термин имеет ровно одно значение</b>. Снаружи то же слово может значить другое — и это нормально. Не пытайся сделать одну модель «Актив» на всю систему: это та самая унификация, которая не окупается.
+</div>
+
+<h2>«Актив» — одно слово, три модели</h2>
+
+<p>В твоей платформе слово <span class="term">Актив</span> живёт в трёх подсистемах. Соблазн новичка — одна гигантская модель <code>Asset</code> с полями на все случаи. Но присмотрись: это <em>разные</em> понятия, у которых случайно одно имя.<sup><a href="#src1">1</a></sup></p>
+
+<div class="ctxmap">
+  <div class="ctx">
+    <h4>Топология</h4>
+    Актив = <b>узел графа</b>: позиция в сети, интерфейсы, порты, связи.
+    <p class="asset">Node(ip, ports, links)</p>
+  </div>
+  <div class="ctx">
+    <h4>Уязвимости</h4>
+    Актив = <b>цель скана</b>: находки, экспозиция, риск.
+    <p class="asset">ScanTarget(findings, risk)</p>
+  </div>
+  <div class="ctx">
+    <h4>Документация</h4>
+    Актив = <b>запись в отчёте</b>: владелец, описание, комплаенс-статус.
+    <p class="asset">AssetEntry(owner, status)</p>
+  </div>
+</div>
+<p class="idbar">↑ связаны не наследованием, а общей идентичностью: <code>asset_id</code> ↑</p>
+
+<p>Три модели, заточенные каждая под свой язык, связаны общим <b>id</b>. Узлу топологии не нужны поля комплаенса; записи в отчёте не нужны порты. Одна «бог-модель» на всех = поля-сироты, условные ветки «а в этом случае не заполнять» и вечные конфликты на ревью.</p>
+
+<h2>Как это выразить в Rails (без engines)</h2>
+
+<p>Тебе не нужны Rails Engines или Packwerk, чтобы провести границу. Достаточно <b>пространства имён</b> и дисциплины. Контекст = модуль-неймспейс со своими агрегатами и сервисами внутри:</p>
+
+<pre><code>app/domain/
+  topology/         <span class="good"># контекст «Топология»</span>
+    graph.rb            Topology::Graph   (корень агрегата)
+    node.rb             Topology::Node
+  vulnerabilities/  <span class="good"># контекст «Уязвимости»</span>
+    scan.rb             Vulnerabilities::Scan
+    finding.rb          Vulnerabilities::Finding
+    cvss_score.rb       Vulnerabilities::CvssScore
+  documentation/    <span class="good"># контекст «Документация»</span>
+    document.rb         Documentation::Document
+    asset_entry.rb      Documentation::AssetEntry</code></pre>
+
+<h2>Через границу — по id и через интерфейс</h2>
+
+<p>Контексты <b>не лазают друг другу в потроха</b>. Reevoo (DDD-монолит на Rails) формулирует жёстко: <em>«доменный модуль не может напрямую вызывать код других модулей»</em>.<sup><a href="#src2">2</a></sup> Связь — по идентичности и через публичный вход:</p>
+
+<div class="compare">
+  <div class="col-bad">
+    <div class="h">✗ Контекст лезет внутрь</div>
+    <code>Documentation::Report<br>&nbsp;.where(node: Topology<wbr>::Node.find(x))</code>
+    <p style="margin:.5rem 0 0;font-size:.85rem">Документация знает внутренности топологии. Изменишь Node — сломаешь отчёты.</p>
+  </div>
+  <div class="col-good">
+    <div class="h">✓ Через id и фасад</div>
+    <code>Topology.summary_for(<br>&nbsp;&nbsp;asset_id)  # публичный<br>&nbsp;&nbsp;# интерфейс контекста</code>
+    <p style="margin:.5rem 0 0;font-size:.85rem">Документация просит у топологии данные через одну дверь. Внутренности скрыты.</p>
+  </div>
+</div>
+
+<p>Способы перехода границы, от простого к строгому: <b>(1)</b> ссылка по <code>asset_id</code>; <b>(2)</b> публичный метод-фасад контекста (<code>Topology.summary_for(id)</code>); <b>(3)</b> доменные события (<code>ScanCompleted</code> → документация подписана) — для слабой связанности.<sup><a href="#src2">2</a></sup></p>
+
+<div class="note">
+  <span class="callout-label">Куда это масштабируется</span>
+  Reevoo доводят изоляцию до отдельных engines и схем БД на контекст<sup><a href="#src2">2</a></sup> — это твой <em>out of scope</em> сейчас. Но правила те же на любом масштабе: id вместо ассоциаций, публичный интерфейс вместо лазания внутрь. Начни с неймспейсов + дисциплины; механизм усилишь позже, когда границы устоятся.
+</div>
+
+<div class="warn">
+  <span class="callout-label">Калибровка — не дроби лишнего</span>
+  Контекст — это <b>реальная граница языка</b>, а не «каждой модели по контексту». Если в двух местах «Актив» значит одно и то же — это один контекст. Дроби там, где слово <em>меняет смысл</em> или где разные команды/процессы владеют разными правилами. Слишком много мелких контекстов = та же связанность, только с церемонией.
+</div>
+
+<h2>Проверь себя</h2>
+<p>По памяти — это решения уровня архитектуры модуля, их ты будешь принимать на дизайн-ревью.</p>
+
+<div class="quiz" data-quiz>
+  <p class="q">Где правильнее всего провести границу ограниченного контекста?</p>
+  <button data-correct>Там, где смысл термина меняется</button>
+  <button>Там, где удобно разложить папки</button>
+  <button>Там, где проходит граница таблиц</button>
+  <p class="explain" hidden><b>Где меняется смысл термина.</b> Модель — это язык; нужна другая модель, когда язык меняется (Фаулер). «Актив» в топологии и в документации — разные понятия → разные контексты. Папки и таблицы вторичны.</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="quiz" data-quiz>
+  <p class="q">«Актив» нужен и топологии, и документации. Как моделировать?</p>
+  <button data-correct>Две модели, связанные общим asset_id</button>
+  <button>Одна большая модель Asset на всех</button>
+  <button>Наследование AssetEntry от Node</button>
+  <p class="explain" hidden><b>Две модели, общий id.</b> Каждый контекст держит свою модель «Актива», заточенную под свой язык; связь — по идентичности. Единая бог-модель = унификация, которая «не окупается» (Фаулер).</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="quiz" data-quiz>
+  <p class="q">Документации нужны данные узла из топологии. Правильный путь?</p>
+  <button data-correct>Публичный фасад топологии по id</button>
+  <button>Прямой запрос к Topology::Node</button>
+  <button>Скопировать модель Node к себе</button>
+  <p class="explain" hidden><b>Публичный фасад по id.</b> Контекст не лезет в чужие внутренности — «модуль не может напрямую вызывать код других модулей». Просим данные через одну дверь (или подписываемся на событие), внутренности топологии скрыты.</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="review">
+  <span class="callout-label">Как защитить на ревью</span>
+  Два вопроса к дизайн-PR. <b>(1)</b> <em>«Этот термин здесь значит то же, что и в соседнем модуле?»</em> — если нет, это сигнал границы контекста, а не повод тащить одну модель. <b>(2)</b> <em>«Этот модуль обращается к чужим внутренностям или через публичный вход?»</em> — прямой <code>OtherContext::Model.where(...)</code> заменяй на фасад/событие + ссылку по id. Формула: <b>«граница — по смыслу слова; через границу — id и публичный интерфейс»</b>.
+</div>
+
+<div class="source" id="src1">
+  <span class="callout-label">Первоисточник — прочитай это</span>
+  <a href="https://martinfowler.com/bliki/BoundedContext.html">Bounded Context — Martin Fowler</a>.
+  Канонический разбор: почему единая модель не масштабируется и как язык задаёт границы. 6 минут.
+  <p style="margin:0.6rem 0 0"><sup id="src2">2</sup> Rails-применение в монолите (события, изоляция, «модуль не зовёт чужой код») — <a href="https://medium.com/reevoo-engineering/domain-driven-monolith-35d902ee9f80">Domain-driven Monolith — Reevoo Engineering</a>.</p>
+</div>
+
+<p class="ask">Самый ценный разговор по этому лессону — на твоей системе: сколько у вас контекстов на самом деле? Топология/Уязвимости/Документация — это три, или, например, «Сбор топологии» и «Анализ топологии» — уже два разных? Принеси список своих сущностей в чат, и проведём границы вместе.</p>
+
+<div class="footer">
+  <b>Курс:</b> DDD для модулей в Rails ·
+  <b>Назад ←</b> <a href="0004-practice-placement.html">Лессон 04: Тренажёр</a> ·
+  <b>Дальше →</b> Лессон 06: <i>Карта контекстов и анти-коррупционный слой</i> — как контексты договариваются и как защищать свой язык от чужого (напр. формат внешнего сканера не должен протекать в твой домен).
+  <br><br>
+  <b>Связано:</b> <a href="../GLOSSARY.md">Глоссарий</a> · <a href="../MISSION.md">Миссия</a> · <a href="../RESOURCES.md">Ресурсы</a>
+</div>
+
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

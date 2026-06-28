@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Лессон 04 — Тренажёр: куда положить логику</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+
+<header class="masthead">
+  <p class="eyebrow">Лессон 04 · DDD в Rails · Тренажёр (skill)</p>
+  <h1>Куда положить логику?</h1>
+  <p class="subtitle">Перемешанная практика по лессонам 01–03. 10 кейсов из платформы ИБ — на каждом одно и то же меню из пяти уровней. Решай быстро, читай фидбэк сразу.</p>
+</header>
+
+<p>Это <b>навыковый</b> лессон, не знаниевый. Кейсы намеренно перемешаны (<span class="term">interleaving</span>) — именно смешивание заставляет тебя <em>различать</em> уровни, а не катиться по инерции. На каждом кейсе одно меню:</p>
+
+<ol style="font-size:0.93rem">
+  <li><b>Объект-значение</b> — поведение про одно значение → метод на нём <span class="en">(Лессон 01)</span></li>
+  <li><b>Команда на корне</b> — изменение состояния одного агрегата + инвариант <span class="en">(Лессон 02)</span></li>
+  <li><b>Доменный сервис</b> — «ничья» логика, несколько агрегатов, без I/O <span class="en">(Лессон 03)</span></li>
+  <li><b>Прикладной сервис-объект</b> — оркестрация: транзакция + сайд-эффекты <span class="en">(Лессон 03)</span></li>
+  <li><b>Запах</b> — логика сбежала от данных, вернуть на модель <span class="en">(анемия)</span></li>
+</ol>
+
+<div class="note">
+  <span class="callout-label">Как проходить</span>
+  Сначала реши сам, потом жми. Ошибка тут полезнее угадывания — она показывает, какой уровень путается. Счёт вверху; в конце — итог.
+</div>
+
+<div class="trainer" data-trainer>
+  <div class="trainer-bar"><span class="trainer-progress"></span><span class="trainer-score"></span></div>
+
+  <!-- 1 · E -->
+  <div class="tcard" data-tcard>
+    <p class="scenario"><code>FindingRiskService</code> берёт одну <code>Finding</code>, читает её же поля <code>cvss</code> и <code>asset_criticality</code>, считает число риска и возвращает. Других агрегатов не трогает.</p>
+    <button>Объект-значение — метод на нём</button>
+    <button>Команда на корне агрегата</button>
+    <button>Доменный сервис — PORO без I/O</button>
+    <button>Прикладной сервис-объект</button>
+    <button data-correct>Запах: логику вернуть на модель</button>
+    <p class="explain" hidden><b>Запах (анемия).</b> Логика про данные <em>одной</em> сущности живёт снаружи — это <code>finding.risk_score</code> на самой модели (или VO). Сервис тут оторвал поведение от данных.</p>
+  </div>
+
+  <!-- 2 · B -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">Контроллер добавляет ребро в граф: <code>topology.links.create!(from_id: 7, to_id: 12)</code> — напрямую, минуя проверки «оба узла внутри» и «не петля».</p>
+    <button>Объект-значение — метод на нём</button>
+    <button data-correct>Команда на корне агрегата</button>
+    <button>Доменный сервис — PORO без I/O</button>
+    <button>Прикладной сервис-объект</button>
+    <button>Запах: логику вернуть на модель</button>
+    <p class="explain" hidden><b>Команда на корне.</b> Это изменение одного агрегата с инвариантами графа → <code>topology.connect(a, b)</code>. Прямой <code>links.create!</code> — «через окно» в обход корня.</p>
+  </div>
+
+  <!-- 3 · C -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">«Поверхность атаки» = берём граничные узлы <em>топологии</em> и считаем критические <em>находки</em> на них. Чистый расчёт, читает два агрегата, ничего не пишет.</p>
+    <button>Объект-значение — метод на нём</button>
+    <button>Команда на корне агрегата</button>
+    <button data-correct>Доменный сервис — PORO без I/O</button>
+    <button>Прикладной сервис-объект</button>
+    <button>Запах: логику вернуть на модель</button>
+    <p class="explain" hidden><b>Доменный сервис.</b> Логика тянет Topology и Findings сразу, не принадлежит ни одному → PORO без состояния и I/O (<code>AttackSurfaceCalculator</code>).</p>
+  </div>
+
+  <!-- 4 · A -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">В трёх вьюхах повторяется <code>case finding.cvss_score; when 9.0..10 then "critical"…</code> — определение severity по числовой оценке.</p>
+    <button data-correct>Объект-значение — метод на нём</button>
+    <button>Команда на корне агрегата</button>
+    <button>Доменный сервис — PORO без I/O</button>
+    <button>Прикладной сервис-объект</button>
+    <button>Запах: логику вернуть на модель</button>
+    <p class="explain" hidden><b>Объект-значение.</b> Поведение про одно значение (оценку) → метод <code>CvssScore#severity</code>. Дублирующийся <code>case</code> во вьюхах — классический сигнал «поведение хочет в VO».</p>
+  </div>
+
+  <!-- 5 · D -->
+  <div class="tcard" data-tcard>
+    <p class="scenario"><code>GenerateComplianceReport</code>: открывает транзакцию, собирает документ из находок, шлёт письмо стейкхолдерам и ставит джобу на архивацию.</p>
+    <button>Объект-значение — метод на нём</button>
+    <button>Команда на корне агрегата</button>
+    <button>Доменный сервис — PORO без I/O</button>
+    <button data-correct>Прикладной сервис-объект</button>
+    <button>Запах: логику вернуть на модель</button>
+    <p class="explain" hidden><b>Прикладной сервис-объект.</b> Оркестрация с сайд-эффектами (письма, джобы, транзакция). Доменных правил не содержит — только дирижирует. Не путать с доменным сервисом.</p>
+  </div>
+
+  <!-- 6 · B -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">Нужно удалить узел из топологии, но <em>только если</em> на него не ссылается ни одна связь — иначе граф порвётся.</p>
+    <button>Объект-значение — метод на нём</button>
+    <button data-correct>Команда на корне агрегата</button>
+    <button>Доменный сервис — PORO без I/O</button>
+    <button>Прикладной сервис-объект</button>
+    <button>Запах: логику вернуть на модель</button>
+    <p class="explain" hidden><b>Команда на корне.</b> Инвариант графа («нельзя удалить занятый узел») охраняет корень → <code>topology.remove_node(node)</code>.</p>
+  </div>
+
+  <!-- 7 · A -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">Логика «нормализовать CIDR и проверить, входит ли IP-адрес в эту подсеть». Всё — про одно значение подсети.</p>
+    <button data-correct>Объект-значение — метод на нём</button>
+    <button>Команда на корне агрегата</button>
+    <button>Доменный сервис — PORO без I/O</button>
+    <button>Прикладной сервис-объект</button>
+    <button>Запах: логику вернуть на модель</button>
+    <p class="explain" hidden><b>Объект-значение.</b> Подсеть — VO; «входит ли IP» — её поведение → <code>Cidr#contains?(ip)</code>. Валидность и нормализация — в конструкторе.</p>
+  </div>
+
+  <!-- 8 · E -->
+  <div class="tcard" data-tcard>
+    <p class="scenario"><code>TopologyStatsService</code> принимает одну топологию и считает количество её же узлов и связей, возвращает хэш статистики.</p>
+    <button>Объект-значение — метод на нём</button>
+    <button>Команда на корне агрегата</button>
+    <button>Доменный сервис — PORO без I/O</button>
+    <button>Прикладной сервис-объект</button>
+    <button data-correct>Запах: логику вернуть на модель</button>
+    <p class="explain" hidden><b>Запах.</b> Считает данные <em>одного</em> агрегата по его же полям → это <code>topology.stats</code> на корне. Один агрегат + чтение себя = сервис не нужен.</p>
+  </div>
+
+  <!-- 9 · C -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">После скана: сопоставить <em>находки</em> с <em>узлами</em> топологии по адресу и пометить, какие узлы экспонированы. Чистая доменная логика поверх двух агрегатов.</p>
+    <button>Объект-значение — метод на нём</button>
+    <button>Команда на корне агрегата</button>
+    <button data-correct>Доменный сервис — PORO без I/O</button>
+    <button>Прикладной сервис-объект</button>
+    <button>Запах: логику вернуть на модель</button>
+    <p class="explain" hidden><b>Доменный сервис.</b> Сопоставление живёт между Findings и Topology, не внутри одного. PORO без I/O. (А вот <em>сохранить</em> результат и уведомить — уже задача прикладного сервиса.)</p>
+  </div>
+
+  <!-- 10 · D -->
+  <div class="tcard" data-tcard>
+    <p class="scenario"><code>RunScan</code>: дёргает внешний сканер по API, сохраняет полученные находки в БД и шлёт уведомление команде безопасности.</p>
+    <button>Объект-значение — метод на нём</button>
+    <button>Команда на корне агрегата</button>
+    <button>Доменный сервис — PORO без I/O</button>
+    <button data-correct>Прикладной сервис-объект</button>
+    <button>Запах: логику вернуть на модель</button>
+    <p class="explain" hidden><b>Прикладной сервис-объект.</b> Внешний API, запись в БД, уведомление — оркестрация с I/O. Доменных правил нет, только координация шагов.</p>
+  </div>
+
+  <div class="trainer-final" hidden></div>
+</div>
+
+<div class="review">
+  <span class="callout-label">Перенос на ревью</span>
+  Эти пять вопросов — твой чек-лист на любом PR с новым классом. Особенно цепляй два «запаха»: сервис, который читает поля <em>одной</em> сущности и кладёт назад (кейсы 1, 8) — почти всегда метод модели. Это и есть «отличить честный код от оверинжиниринга».
+</div>
+
+<p class="ask">Какой-то кейс показался спорным или у тебя в коде есть «пограничный» класс — кидай в чат, разберём, почему он сел именно на этот уровень.</p>
+
+<div class="footer">
+  <b>Курс:</b> DDD для модулей в Rails ·
+  <b>Назад ←</b> <a href="0003-domain-service.html">Лессон 03: Где живёт логика</a> ·
+  <b>Дальше →</b> Лессон 05: <i>Ограниченный контекст</i> — собираем агрегаты и сервисы в модуль и проводим границу Топология / Уязвимости / Документация.
+  <br><br>
+  <b>Связано:</b> <a href="../GLOSSARY.md">Глоссарий</a> · <a href="../reference/value-object.html">Шпаргалка: Value Object</a> · <a href="../MISSION.md">Миссия</a>
+</div>
+
+<script src="../assets/trainer.js"></script>
+</body>
+</html>

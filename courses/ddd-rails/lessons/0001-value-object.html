@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Лессон 01 — Value Object: первый кирпич доменного модуля</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+
+<header class="masthead">
+  <p class="eyebrow">Лессон 01 · DDD в Rails · Tactical-паттерны</p>
+  <h1>Value Object</h1>
+  <p class="subtitle">Первый кирпич доменного модуля: как превратить «голую колонку» в понятие домена, у которого нельзя быть невалидным.</p>
+</header>
+
+<p>Твоя миссия — <b>командный стандарт</b> модулей поверх ActiveRecord. Прежде чем строить агрегаты и доменные сервисы, нужен самый мелкий кирпич, из которого они складываются. Это <span class="term">Value Object</span> <span class="en">(объект-значение)</span>. Он даёт первый ощутимый выигрыш: <b>невалидное состояние перестаёт компилироваться</b>.</p>
+
+<h2>Идея за одну минуту</h2>
+
+<p>DDD делит доменные объекты на два вида по одному вопросу: <em>важна ли индивидуальность?</em></p>
+
+<ul>
+  <li><span class="term">Entity</span> <span class="en">(сущность)</span> — у неё есть <b>идентичность</b>. Актив <code>id=42</code> остаётся тем же активом, даже если у него сменился IP и имя. Сравниваем по <code>id</code>.</li>
+  <li><span class="term">Value Object</span> — <b>идентичности нет</b>, важно только значение. CVSS&nbsp;7.5 — это просто 7.5; две «семь-с-половиной» взаимозаменяемы. Сравниваем по содержимому.<sup><a href="#src1">1</a></sup></li>
+</ul>
+
+<div class="insight">
+  <span class="callout-label">Ключевой признак</span>
+  Если объект можно целиком заменить другим с тем же значением и ничего не сломается — это Value Object. Купюру в 100&nbsp;₽ ты меняешь на другую сотню не глядя на серийный номер. CVSS-оценку, IP-адрес, CVE-идентификатор — так же.
+</div>
+
+<p>У Value Object три свойства, и каждое — рычаг против хаоса в коде:</p>
+
+<ol>
+  <li><b>Иммутабельность.</b> Создан — не меняется. Нужно другое значение — создаёшь новый объект. Нет «кто-то поменял оценку под нами».</li>
+  <li><b>Валидность по построению.</b> Объект нельзя создать в невалидном состоянии. Нет CVSS&nbsp;=&nbsp;11.0 и нет severity, не совпадающего с оценкой.</li>
+  <li><b>Поведение едет вместе с данными.</b> «Какая это severity?», «это критично?» — методы самого объекта, а не разбросанные по хелперам <code>if</code>-ы.<sup><a href="#src2">2</a></sup></li>
+</ol>
+
+<h2>Как это выглядит у нас (домен ИБ)</h2>
+
+<p>Типичная уязвимость в нашей платформе: ActiveRecord-модель <code>Finding</code> с колонками <code>cvss_score:float</code> и <code>severity:string</code>. Rails-привычка — держать оба поля на модели и считать severity где-нибудь рядом:</p>
+
+<p class="code-label">⟂ Было: данные и логика размазаны по AR</p>
+<pre><code><span class="bad"># app/models/finding.rb</span>
+class Finding < ApplicationRecord
+  validates :cvss_score, inclusion: { in: 0.0..10.0 }
+  validates :severity, inclusion: { in: %w[none low medium high critical] }
+
+  <span class="bad"># severity и score можно рассинхронить — никто не мешает</span>
+  <span class="bad"># записать score=9.0, severity="low". База это проглотит.</span>
+end
+
+<span class="bad"># app/helpers/findings_helper.rb — логика «уехала» от данных</span>
+def severity_badge(finding)
+  case finding.cvss_score
+  when 9.0..10.0 then "critical"
+  when 7.0...9.0 then "high"
+  <span class="bad"># ...тот же case продублирован в трёх местах проекта</span>
+  end
+end</code></pre>
+
+<p>Доменное понятие здесь — <b>не «два поля»</b>, а одно: <span class="term">CVSS-оценка</span>. У неё есть значение (0.0–10.0) и поведение (в какой severity-корзине она лежит). Соберём её в Value Object — PORO, без наследования от <code>ActiveRecord::Base</code>:</p>
+
+<p class="code-label">✓ Стало: одно понятие домена, невалидность непредставима</p>
+<pre><code><span class="good"># app/domain/security/cvss_score.rb</span>
+module Security
+  class CvssScore
+    include Comparable
+    SEVERITIES = { 0.0..0.1 => :none, 0.1..4.0 => :low,
+                   4.0..7.0 => :medium, 7.0..9.0 => :high,
+                   9.0..10.0 => :critical }.freeze
+
+    attr_reader :value
+
+    def initialize(value)
+      value = Float(value)
+      unless (0.0..10.0).cover?(value)
+        raise ArgumentError, "CVSS вне диапазона: #{value}"
+      end
+      @value = value
+      freeze                      <span class="good"># иммутабельность</span>
+    end
+
+    def severity                  <span class="good"># поведение едет с данными</span>
+      SEVERITIES.find { |range, _| range.cover?(value) }.last
+    end
+
+    def critical? = severity == :critical
+
+    def <=>(other) = value <=> other.value   <span class="good"># сравнение по значению</span>
+    def ==(other) = other.is_a?(CvssScore) && value == other.value
+    def to_s = format("%.1f", value)
+  end
+end</code></pre>
+
+<p>Теперь <code>severity</code> <b>невозможно</b> рассинхронить со score — её больше нет как отдельной колонки, она <em>вычисляется</em> из единственного источника правды. А AR-модель хранит примитив и отдаёт Value Object:</p>
+
+<pre><code><span class="good"># app/models/finding.rb</span>
+class Finding < ApplicationRecord
+  def cvss = Security::CvssScore.new(cvss_score)
+end
+
+finding.cvss.severity   <span class="good"># => :high</span>
+finding.cvss.critical?  <span class="good"># => false</span>
+Security::CvssScore.new(11.0)  <span class="bad"># => ArgumentError, до базы не дойдёт</span></code></pre>
+
+<div class="note">
+  <span class="callout-label">Почему PORO, а не AR</span>
+  Value Object не имеет идентичности и жизненного цикла в базе — наследовать его от <code>ActiveRecord::Base</code> незачем. Это обычный Ruby-объект.<sup><a href="#src2">2</a></sup> Под капотом можно использовать и <code>composed_of</code> Rails, но начни с чистого PORO — стандарт команды должен быть переносимым и явным.
+</div>
+
+<h2>Проверь себя</h2>
+<p>Не подглядывая выше — вспомни по памяти. Это и есть тренировка, которая закрепляет надолго.</p>
+
+<div class="quiz" data-quiz>
+  <p class="q">IP-адрес актива в топологии. Entity или Value Object?</p>
+  <button data-correct>Value Object: важно значение адреса</button>
+  <button>Entity: у адреса всегда свой id</button>
+  <button>Entity: адрес меняется во времени</button>
+  <p class="explain" hidden><b>Value Object.</b> Адрес <code>10.0.0.5</code> взаимозаменяем с любым другим <code>10.0.0.5</code> — индивидуальности нет, важно только значение. Сам <em>актив</em> — Entity, но его адрес — значение.</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="quiz" data-quiz>
+  <p class="q">Зачем делать Value Object иммутабельным (freeze)?</p>
+  <button data-correct>Чтобы значение нельзя было тихо подменить</button>
+  <button>Чтобы объект работал быстрее в кэше</button>
+  <button>Чтобы Rails сохранял объект в базу</button>
+  <p class="explain" hidden><b>Чтобы значение нельзя было тихо подменить.</b> Если один кусок кода держит ссылку на CVSS-оценку, а другой её мутирует — получаем «оценка поменялась под нами». Иммутабельность убирает целый класс багов: нужно другое значение — создаёшь новый объект.</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="quiz" data-quiz>
+  <p class="q">Главный выигрыш переноса severity внутрь CvssScore?</p>
+  <button data-correct>Невалидное состояние стало непредставимым</button>
+  <button>Кода в проекте стало заметно меньше</button>
+  <button>Запросы к базе данных стали быстрее</button>
+  <p class="explain" hidden><b>Невалидное состояние стало непредставимым.</b> Раньше score и severity жили в двух колонках и могли противоречить друг другу. Теперь severity вычисляется из единственного источника правды — рассинхрон физически невозможен. Это и есть «make illegal states unrepresentable».</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="review">
+  <span class="callout-label">Как защитить на ревью</span>
+  Когда коллега принесёт PR с парой колонок вроде <code>score</code> + <code>level</code>, <code>ip</code> + <code>subnet_mask</code>, <code>cve_id</code>-строкой с ручной валидацией — спроси: <em>«это одно понятие домена? могут ли эти поля противоречить друг другу?»</em> Если да — это кандидат в Value Object. Формулировка для команды: <b>«одно понятие — один объект; невалидное состояние не должно компилироваться»</b>.
+</div>
+
+<div class="source" id="src1">
+  <span class="callout-label">Первоисточник — прочитай это</span>
+  <a href="https://www.sitepoint.com/ddd-for-rails-developers-part-2-entities-and-values/">DDD for Rails Developers. Part 2: Entities and Values — SitePoint</a>.
+  Самое ясное объяснение различия Entity/Value Object на языке Rails-разработчика. 10 минут.
+  <p style="margin:0.6rem 0 0"><sup id="src2">2</sup> Глубже про реализацию на PORO поверх AR — серия <a href="https://www.visuality.pl/posts/aggregate-ddd-in-ruby-on-rails">DDD in Ruby on Rails (Visuality)</a>, наш основной источник по миссии.</p>
+</div>
+
+<p class="ask">Я твой учитель по этому курсу — если что-то неясно (почему не <code>composed_of</code>? как тестировать Value Object? где провести грань с Entity?), просто спроси в чате. Это часть урока.</p>
+
+<div class="footer">
+  <b>Курс:</b> DDD для модулей в Rails ·
+  <b>Дальше →</b> Лессон 02: <i>Агрегат и корень агрегата</i> — как Value Objects и Entity собираются в модуль с одной точкой входа (на примере топологии: <code>Topology → Node → Link</code>).
+  <br><br>
+  <b>Связано:</b> <a href="../MISSION.md">Миссия</a> · <a href="../RESOURCES.md">Ресурсы</a>
+</div>
+
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

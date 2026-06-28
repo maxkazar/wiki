@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Лессон 07 — Анти-коррупционный слой</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+<style>
+  .acl { display:flex; align-items:stretch; gap:0.5rem; margin:1.4rem 0; font-size:0.8rem; }
+  .acl .box { flex:1; border:1px solid var(--rule); border-radius:6px; padding:0.7rem; text-align:center; }
+  .acl .ext { background:#f3e7e7; border-color:var(--ruby); }
+  .acl .lay { background:#f0ece0; }
+  .acl .dom { background:var(--good-soft); border-color:var(--good); }
+  .acl .arrow { display:flex; align-items:center; color:var(--accent); font-weight:700; }
+  .acl code { font-size:0.72rem; }
+  @media (max-width:34rem){ .acl{ flex-direction:column; } .acl .arrow{ justify-content:center; transform:rotate(90deg); } }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <p class="eyebrow">Лессон 07 · DDD в Rails · Стратегический уровень</p>
+  <h1>Анти-коррупционный слой</h1>
+  <p class="subtitle">Граница с внешним миром. Как формат стороннего сканера переводится в твой домен — и не протекает в него. Прямое продолжение этапа 5 капстоуна.</p>
+</header>
+
+<p>В <a href="0006-capstone-scan-module.html">капстоуне</a> всплыл вопрос: куда осесть сырому формату внешнего сканера, чтобы он не загрязнил домен? Ответ — <span class="term">Анти-коррупционный слой</span> <span class="en">(Anti-Corruption Layer, ACL)</span>. Tangible win: <b>научиться защищать язык своего домена от чужой модели на границе интеграции</b>.</p>
+
+<h2>Идея за одну минуту</h2>
+
+<p>Эрик Эванс (паттерн описан в <em>Domain-Driven Design</em>): размести между подсистемами с разной семантикой <b>фасад/адаптер, который переводит</b> запросы из одной модели в другую.<sup><a href="#src1">1</a></sup> Зачем — Microsoft формулирует прямо: внешние системы часто несут <em>«запутанные схемы данных и устаревшие API»</em>; если новый код вынужден подстраиваться под их семантику, это <em>«разлагает то, что иначе было бы чисто спроектированным приложением»</em>.<sup><a href="#src1">1</a></sup></p>
+
+<div class="insight">
+  <span class="callout-label">Главная мысль</span>
+  Без ACL чужой словарь (поля Nessus, шкала OpenVAS, формат Qualys) расползается по твоему домену: модель <code>Finding</code> обрастает <code>plugin_id</code>, <code>risk_factor</code> и прочими «не своими» понятиями. ACL — это шлюз, где <b>чужой язык переводится в твой ровно один раз</b>, и дальше домен говорит только на своём.
+</div>
+
+<h2>Три слоя ACL</h2>
+<p>Канонически ACL разбит на три части — каждая PORO:<sup><a href="#src2">2</a></sup></p>
+
+<div class="acl">
+  <div class="box ext"><b>Внешний сканер</b><br>Nessus / OpenVAS<br><code>{plugin_id, risk_factor: "Critical", cvss3_base}</code></div>
+  <div class="arrow">→</div>
+  <div class="box lay"><b>Adapter</b><br>HTTP, авторизация, ретраи<br><code>NessusAdapter</code></div>
+  <div class="arrow">→</div>
+  <div class="box lay"><b>Translator</b><br>чужой формат → домен<br><code>NessusTranslator</code></div>
+  <div class="arrow">→</div>
+  <div class="box dom"><b>Домен</b><br>чистые объекты<br><code>Finding(CveId, CvssScore)</code></div>
+</div>
+
+<ul style="font-size:0.93rem">
+  <li><b>Adapter</b> — протокол: HTTP-вызовы, авторизация, ретраи, ошибки. Отдаёт сырой ответ.<sup><a href="#src2">2</a></sup></li>
+  <li><b>Translator</b> — перевод: сырой JSON → доменные <code>Finding</code>/<code>CvssScore</code>/<code>CveId</code>. Здесь умирает чужой словарь.</li>
+  <li><b>Facade (порт)</b> — публичный вход в языке твоего домена: <code>VulnerabilityScanner#scan(asset_id) → [Finding]</code>.</li>
+</ul>
+
+<h2>Как это выглядит в Rails</h2>
+
+<pre><code><span class="good"># Порт в языке домена — от него зависит RunScan, не от Nessus</span>
+module Vulnerabilities
+  class VulnerabilityScanner          <span class="good"># Facade / порт</span>
+    def initialize(adapter:, translator:)
+      @adapter, @translator = adapter, translator
+    end
+    def scan(asset_id)
+      raw = @adapter.fetch(asset_id)   <span class="good"># чужой формат</span>
+      @translator.to_findings(raw)     <span class="good"># → доменные Finding</span>
+    end
+  end
+end
+
+<span class="good"># Translator — единственное место, где живёт чужой словарь</span>
+class NessusTranslator
+  def to_findings(raw)
+    raw.fetch("vulnerabilities").map do |v|
+      Vulnerabilities::Finding.new(
+        cve:  Vulnerabilities::CveId.new(v.fetch("cve")),
+        cvss: Vulnerabilities::CvssScore.new(v.fetch("cvss3_base")),
+        asset_id: v.fetch("asset_id"))
+      <span class="good"># их "risk_factor":"Critical" НЕ берём — severity выводим из CVSS сами</span>
+    end
+  end
+end</code></pre>
+
+<p>Поменяли Nessus на OpenVAS — пишешь новый <code>OpenVasAdapter</code> + <code>OpenVasTranslator</code> за тем же портом. <b>Домен и <code>RunScan</code> не трогаются вообще.</b> Вот что покупает ACL.</p>
+
+<div class="warn">
+  <span class="callout-label">Граница доверия = граница безопасности</span>
+  Внешний сканер — <b>недоверенный ввод</b>. Microsoft: на этой границе <em>«применяй валидацию и санитизацию ввода»</em>, ведь подсистемы имеют разный уровень доверия.<sup><a href="#src1">1</a></sup> Для твоей ИБ-платформы это не абстракция: <code>Translator</code> — естественное место проверить, что CVE-id настоящий, CVSS в диапазоне, asset_id known. <code>CvssScore.new</code> уже валиден по построению (Лессон 01) — VO работают на тебя и здесь.
+</div>
+
+<div class="warn">
+  <span class="callout-label">Калибровка — только перевод, без правил</span>
+  В ACL кладут <b>только трансляцию</b>. Microsoft прямо: <em>«сосредоточь слой на логике перевода; не размещай в нём бизнес-правила или оркестрацию»</em>.<sup><a href="#src1">1</a></sup> И не строй ACL, если семантического разрыва нет: когда чужой формат почти совпадает с твоим — хватит простого маппинга. ACL окупается там, где словари реально расходятся (а у сканеров они расходятся сильно).
+</div>
+
+<h2>Проверь себя</h2>
+<p>По памяти — это решения на границе любой внешней интеграции.</p>
+
+<div class="quiz" data-quiz>
+  <p class="q">Зачем вообще нужен анти-коррупционный слой на интеграции?</p>
+  <button data-correct>Чтобы чужая модель не протекла в домен</button>
+  <button>Чтобы ускорить запросы к внешнему API</button>
+  <button>Чтобы хранить ответы сканера в кэше</button>
+  <p class="explain" hidden><b>Чтобы чужая модель не протекла в домен.</b> Без ACL словарь сканера (plugin_id, risk_factor) расползается по твоим моделям и «разлагает» чистый дизайн. ACL переводит чужой язык в твой ровно один раз, на границе.</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="quiz" data-quiz>
+  <p class="q">В какой части ACL живёт перевод чужого формата в Finding?</p>
+  <button data-correct>В транслейторе между адаптером и доменом</button>
+  <button>В адаптере, вместе с HTTP и ретраями</button>
+  <button>В доменной модели Finding напрямую</button>
+  <p class="explain" hidden><b>В транслейторе.</b> Adapter отвечает только за протокол (HTTP, авторизация, ретраи), Translator — за маппинг чужого JSON в доменные объекты. Домен про чужой формат не знает вовсе.</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="quiz" data-quiz>
+  <p class="q">Что НЕ должно жить внутри анти-коррупционного слоя?</p>
+  <button data-correct>Бизнес-правила и оркестрация процесса</button>
+  <button>Валидация и санитизация чужого ввода</button>
+  <button>Маппинг чужих полей в доменные типы</button>
+  <p class="explain" hidden><b>Бизнес-правила и оркестрация.</b> ACL — только перевод (+ валидация ввода на границе доверия). Логика домена остаётся на агрегатах и сервисах; смешивать её с трансляцией — значит снова всё запутать.</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="review">
+  <span class="callout-label">Как защитить на ревью</span>
+  Три вопроса к PR с внешней интеграцией. <b>(1)</b> <em>«Чужие поля (plugin_id, risk_factor) видны где-то за транслейтором?»</em> — если да, словарь протёк, верни перевод на границу. <b>(2)</b> <em>«Домен зависит от порта в своём языке или от класса сканера?»</em> — зависимость должна смотреть на <code>VulnerabilityScanner</code>, не на <code>Nessus*</code>. <b>(3)</b> <em>«Внешний ввод провалидирован на границе?»</em> Формула: <b>«чужой язык умирает в транслейторе; домен зависит от порта, а не от вендора»</b>.
+</div>
+
+<div class="source" id="src1">
+  <span class="callout-label">Первоисточник — прочитай это</span>
+  <a href="https://learn.microsoft.com/en-us/azure/architecture/patterns/anti-corruption-layer">Anti-Corruption Layer Pattern — Microsoft Azure Architecture Center</a>.
+  Чёткий разбор: проблема «разложения» домена, решение через перевод, когда применять и когда нет. 8 минут.
+  <p style="margin:0.6rem 0 0"><sup id="src2">2</sup> Трёхслойная структура Adapter/Translator/Facade — <a href="https://deviq.com/domain-driven-design/anti-corruption-layer/">Anti-Corruption Layer — DevIQ</a>.</p>
+</div>
+
+<p class="ask">Если у вас уже есть интеграция со сканером — принеси кусок маппинга в чат. Посмотрим, не протекают ли чужие поля в домен и где провести границу транслейтора. Это самый частый источник «гнили» в ИБ-платформах.</p>
+
+<div class="footer">
+  <b>Курс:</b> DDD для модулей в Rails ·
+  <b>Назад ←</b> <a href="0006-capstone-scan-module.html">Лессон 06: Капстоун</a> ·
+  <b>Дальше →</b> Лессон 08: <i>Повторение с интервалом</i> — смешанный прогон по всем семи лессонам через паузу, чтобы знание осело в долгую память (storage strength).
+  <br><br>
+  <b>Связано:</b> <a href="../GLOSSARY.md">Глоссарий</a> · <a href="../MISSION.md">Миссия</a> · <a href="../RESOURCES.md">Ресурсы</a>
+</div>
+
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

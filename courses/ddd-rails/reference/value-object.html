@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference — Value Object (DDD в Rails)</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+<style>
+  /* reference docs: denser, print-first */
+  body { max-width: 44rem; padding-top: 2.5rem; }
+  .card { border:1px solid var(--rule); border-radius:6px; padding:0.8rem 1rem; margin:0.8rem 0; }
+  table { border-collapse: collapse; width:100%; font-size:0.9rem; margin:1rem 0; }
+  th, td { text-align:left; padding:0.45rem 0.6rem; border-bottom:1px solid var(--rule); vertical-align:top; }
+  th { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-soft); }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <p class="eyebrow">Reference · DDD в Rails · Tactical-паттерны</p>
+  <h1>Value Object — шпаргалка</h1>
+  <p class="subtitle">Компрессия <a href="../lessons/0001-value-object.html">Лессона 01</a>. Держи под рукой на ревью.</p>
+</header>
+
+<h2>Определение за одну строку</h2>
+<p>Доменное понятие <b>без идентичности</b>: важно только значение, оно <b>иммутабельно</b> и <b>валидно по построению</b>, а поведение едет вместе с данными.</p>
+
+<h2>Entity или Value Object? — тест за 5 секунд</h2>
+<table>
+  <tr><th>Вопрос</th><th>Да → Entity</th><th>Нет → Value Object</th></tr>
+  <tr><td>Важно «тот же самый», даже если поля изменились?</td><td>Актив, Скан, Документ</td><td>—</td></tr>
+  <tr><td>Можно заменить на другой с тем же значением, не глядя на id?</td><td>—</td><td>CVSS, IP, CVE-id, порт, критичность</td></tr>
+  <tr><td>Сравниваем по…</td><td><code>id</code></td><td>содержимому</td></tr>
+</table>
+
+<h2>Три обязательных свойства</h2>
+<div class="card"><b>1. Иммутабельность.</b> <code>freeze</code> в конструкторе. Нужно другое значение → новый объект.</div>
+<div class="card"><b>2. Валидность по построению.</b> Конструктор поднимает <code>ArgumentError</code> на невалидном входе. Невалидный объект не существует.</div>
+<div class="card"><b>3. Поведение с данными.</b> Вопросы к значению (<code>severity</code>, <code>critical?</code>, <code>contains?</code>) — методы объекта, не внешние хелперы.</div>
+
+<h2>Скелет на Ruby (PORO поверх AR)</h2>
+<pre><code>class CvssScore
+  include Comparable
+  attr_reader :value
+
+  def initialize(value)
+    @value = Float(value)
+    raise ArgumentError unless (0.0..10.0).cover?(@value)
+    freeze
+  end
+
+  def severity = ...          # поведение
+  def <=>(o) = value <=> o.value   # порядок
+  def ==(o) = o.is_a?(self.class) && value == o.value
+end</code></pre>
+
+<h2>Кандидаты в нашем домене ИБ</h2>
+<table>
+  <tr><th>Value Object</th><th>Значение</th><th>Поведение</th></tr>
+  <tr><td><code>CvssScore</code></td><td>0.0–10.0</td><td>severity, critical?</td></tr>
+  <tr><td><code>IpAddress</code> / <code>Cidr</code></td><td>адрес / подсеть</td><td>contains?, private?</td></tr>
+  <tr><td><code>CveId</code></td><td>CVE-2024-12345</td><td>year, valid_format?</td></tr>
+  <tr><td><code>AssetCriticality</code></td><td>low…critical</td><td>порядок, ≥ порога</td></tr>
+  <tr><td><code>Port</code></td><td>0–65535</td><td>well_known?, протокол</td></tr>
+</table>
+
+<h2>Триггеры на ревью</h2>
+<ul>
+  <li>Две колонки, которые <b>могут противоречить</b> (<code>score</code>+<code>level</code>) → объединить в Value Object.</li>
+  <li>Один и тот же <code>case</code>/валидация повторяется в нескольких местах → поведение «хочет» в объект.</li>
+  <li>Строка с ручной regex-валидацией в разных контроллерах → Value Object с валидацией в конструкторе.</li>
+</ul>
+
+<div class="warn">
+  <span class="callout-label">Калибровка — не оверинжинирь</span>
+  Если «значение» используется в одном месте и не имеет поведения — может, хватит и колонки. Value Object окупается, когда есть <b>поведение</b> или <b>риск невалидного/противоречивого состояния</b>. См. контр-перспективу <a href="https://dev.37signals.com/active-record-nice-and-blended/">37signals</a>.
+</div>
+
+<div class="footer">
+  <a href="../lessons/0001-value-object.html">← Лессон 01</a> · <a href="../RESOURCES.md">Ресурсы</a>
+</div>
+
+</body>
+</html>

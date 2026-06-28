@@ -1,0 +1,355 @@
+/* lesson.css — shared stylesheet for the DDD-in-Rails course.
+   Tufte-inspired: warm paper, serif body, generous margins, sidenotes. */
+
+:root {
+  --paper: #fffef8;
+  --ink: #1a1a1a;
+  --ink-soft: #5a5a52;
+  --rule: #e6e2d3;
+  --accent: #8a1c1c;        /* deep ruby — ties to "domain" red */
+  --accent-soft: #f3e7e7;
+  --code-bg: #f4f1e6;
+  --ruby: #b32424;
+  --good: #2f6b2f;
+  --good-soft: #e7f0e4;
+  --maxw: 38rem;
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 18px; }
+
+body {
+  margin: 0 auto;
+  padding: 4rem 2rem 6rem;
+  max-width: var(--maxw);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Masthead ---- */
+.eyebrow {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 0.4rem;
+}
+h1 {
+  font-size: 2rem;
+  line-height: 1.12;
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+.subtitle {
+  color: var(--ink-soft);
+  font-style: italic;
+  font-size: 1.06rem;
+  margin: 0 0 2rem;
+}
+.masthead {
+  border-bottom: 2px solid var(--ink);
+  padding-bottom: 1.4rem;
+  margin-bottom: 2.2rem;
+}
+
+/* ---- Structure ---- */
+h2 {
+  font-size: 1.3rem;
+  margin: 2.6rem 0 0.8rem;
+  font-weight: 600;
+}
+h3 { font-size: 1.08rem; margin: 1.8rem 0 0.5rem; }
+p { margin: 0 0 1rem; }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid var(--accent-soft); }
+a:hover { border-bottom-color: var(--accent); }
+
+ul, ol { padding-left: 1.3rem; }
+li { margin: 0.3rem 0; }
+
+/* ---- Callouts ---- */
+.note, .insight, .warn, .review {
+  border-left: 3px solid var(--rule);
+  padding: 0.8rem 1.1rem;
+  margin: 1.4rem 0;
+  background: #faf8ef;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.96rem;
+}
+.insight { border-left-color: var(--accent); background: var(--accent-soft); }
+.warn { border-left-color: #c79100; background: #fbf3dd; }
+.review { border-left-color: var(--good); background: var(--good-soft); }
+.note b, .insight b, .warn b, .review b { display: inline; }
+.callout-label {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--ink-soft);
+}
+
+/* ---- Code ---- */
+code {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 0.86em;
+  background: var(--code-bg);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+.code-label {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 1.2rem 0 -0.6rem;
+}
+.bad { color: var(--ruby); }
+.good { color: var(--good); }
+
+/* ---- Term / ubiquitous language chip ---- */
+.term {
+  font-style: normal;
+  font-weight: 600;
+  border-bottom: 1px dotted var(--accent);
+}
+.en { color: var(--ink-soft); font-style: italic; font-size: 0.92em; }
+
+/* ---- Two-column compare ---- */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.4rem 0; }
+.compare > div { border: 1px solid var(--rule); border-radius: 6px; padding: 0.9rem; font-size: 0.9rem; }
+.compare .h { font-weight: 600; margin-bottom: 0.5rem; font-size: 0.95rem; }
+.compare .col-bad .h { color: var(--ruby); }
+.compare .col-good .h { color: var(--good); }
+@media (max-width: 34rem) { .compare { grid-template-columns: 1fr; } }
+
+/* ---- Footer / nav ---- */
+.footer {
+  margin-top: 3.5rem;
+  padding-top: 1.4rem;
+  border-top: 2px solid var(--ink);
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+.footer a { font-weight: 600; }
+.source {
+  background: #f0ece0;
+  border-radius: 6px;
+  padding: 1rem 1.1rem;
+  margin: 2rem 0 1rem;
+  font-size: 0.92rem;
+}
+.source .callout-label { color: var(--accent); }
+.ask {
+  font-style: italic;
+  color: var(--ink-soft);
+  text-align: center;
+  margin: 2rem 0 0;
+  font-size: 0.95rem;
+}
+
+/* ---- Quiz widget (see assets/quiz.js) ---- */
+.quiz {
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 1.2rem 1.3rem;
+  margin: 1.6rem 0;
+  background: #fbfaf3;
+}
+.quiz .q { font-weight: 600; margin: 0 0 0.9rem; }
+.quiz button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.6rem 0.8rem;
+  margin: 0.4rem 0;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.quiz button:hover:not(:disabled) { border-color: var(--accent); }
+.quiz button:disabled { cursor: default; opacity: 0.85; }
+.quiz button.is-correct { background: var(--good-soft); border-color: var(--good); color: var(--good); font-weight: 600; }
+.quiz button.is-wrong { background: var(--accent-soft); border-color: var(--ruby); color: var(--ruby); }
+.quiz .explain {
+  margin: 0.9rem 0 0;
+  padding: 0.7rem 0.9rem;
+  background: var(--paper);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 4px 4px 0;
+  font-size: 0.92rem;
+}
+.quiz .retry {
+  margin-top: 0.8rem;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  width: auto;
+  padding: 0;
+}
+
+/* ---- Trainer widget (see assets/trainer.js) ---- */
+.trainer { margin: 1.6rem 0; }
+.trainer-bar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  margin-bottom: 1.2rem;
+  z-index: 5;
+}
+.trainer-score { color: #f0d27a; }
+.tcard {
+  border: 1px solid var(--rule);
+  border-left: 4px solid var(--rule);
+  border-radius: 8px;
+  padding: 1.1rem 1.2rem;
+  margin: 1rem 0;
+  background: #fbfaf3;
+  counter-increment: tcard;
+}
+.tcard-ok { border-left-color: var(--good); }
+.tcard-miss { border-left-color: var(--ruby); }
+.tcard .scenario { margin: 0 0 0.9rem; }
+.tcard .scenario::before {
+  content: "Кейс " counter(tcard);
+  display: block;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.4rem;
+}
+.tcard pre { margin: 0.6rem 0; }
+.tcard button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.92rem;
+  padding: 0.55rem 0.8rem;
+  margin: 0.35rem 0;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.tcard button:hover:not(:disabled) { border-color: var(--accent); }
+.tcard button:disabled { cursor: default; opacity: 0.85; }
+.tcard button.is-correct { background: var(--good-soft); border-color: var(--good); color: var(--good); font-weight: 600; }
+.tcard button.is-wrong { background: var(--accent-soft); border-color: var(--ruby); color: var(--ruby); }
+.tcard .explain {
+  margin: 0.8rem 0 0;
+  padding: 0.65rem 0.85rem;
+  background: var(--paper);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 4px 4px 0;
+  font-size: 0.9rem;
+}
+.trainer { counter-reset: tcard; }
+.trainer-final {
+  margin-top: 1.4rem;
+  padding: 1.1rem 1.2rem;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 1rem;
+}
+
+/* ---- Reveal (self-check reference answer; native <details>) ---- */
+.reveal {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--good);
+  border-radius: 0 6px 6px 0;
+  background: var(--good-soft);
+  padding: 0.2rem 1rem;
+  margin: 0.9rem 0 1.6rem;
+}
+.reveal > summary {
+  cursor: pointer;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--good);
+  padding: 0.6rem 0;
+  list-style: none;
+  user-select: none;
+}
+.reveal > summary::-webkit-details-marker { display: none; }
+.reveal > summary::before { content: "▸ "; }
+.reveal[open] > summary::before { content: "▾ "; }
+.reveal[open] > summary { border-bottom: 1px solid var(--rule); margin-bottom: 0.6rem; }
+.reveal .check { list-style: none; padding-left: 0; }
+.reveal .check li { padding-left: 1.5rem; position: relative; }
+.reveal .check li::before {
+  content: "☐"; position: absolute; left: 0; color: var(--good); font-size: 1.05rem;
+}
+
+/* ---- Brief / task card ---- */
+.brief {
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  padding: 1.1rem 1.3rem;
+  margin: 1.6rem 0;
+  background: #fff;
+}
+.brief .callout-label { color: var(--accent); }
+.stage {
+  counter-increment: stage;
+  border-top: 1px solid var(--rule);
+  padding-top: 1.4rem;
+  margin-top: 2rem;
+}
+.stage > h2::before {
+  content: "Этап " counter(stage) " · ";
+  color: var(--accent);
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+}
+body { counter-reset: stage; }
+.prompt-q { font-weight: 600; margin: 0.6rem 0; }
+
+/* ---- Print ---- */
+@media print {
+  body { padding: 0; max-width: 100%; font-size: 11pt; }
+  .quiz-btn, .footer-nav { display: none; }
+  pre, .note, .insight { break-inside: avoid; }
+}

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Курс: DDD в Rails — оглавление</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow"><a href="../../index.html">← Все материалы</a> · Курс</p>
+    <h1>DDD в <em>Rails</em></h1>
+    <p class="lede">Командный стандарт проектирования модулей: как строить бизнес-логику по принципам DDD поверх ActiveRecord — через PORO и сервис-объекты, без тяжёлых инструментов. Восемь коротких уроков с практикой, сквозной домен — платформа управления ИБ (топология, уязвимости, документация).</p>
+    <p style="margin-top:24px"><a class="cta" href="lessons/0001-value-object.html">Начать с урока 01 →</a></p>
+  </header>
+
+  <section class="section">
+    <h2>8 уроков · проходить по порядку</h2>
+
+    <p class="track">Tactical-паттерны</p>
+    <ul class="lessons">
+      <li><a class="lesson" href="lessons/0001-value-object.html">
+        <span class="n">01</span>
+        <span class="body"><span class="t">Value Object</span><span class="d">Первый кирпич: превращаем «голую колонку» в понятие домена, которому нельзя быть невалидным.</span></span>
+        <span class="arrow">→</span></a></li>
+      <li><a class="lesson" href="lessons/0002-aggregate.html">
+        <span class="n">02</span>
+        <span class="body"><span class="t">Агрегат и корень агрегата</span><span class="d">Как Value Objects и Entity собираются в модуль с одной точкой входа и границей консистентности.</span></span>
+        <span class="arrow">→</span></a></li>
+    </ul>
+
+    <p class="track">Калибровка</p>
+    <ul class="lessons">
+      <li><a class="lesson" href="lessons/0003-domain-service.html">
+        <span class="n">03</span>
+        <span class="body"><span class="t">Где живёт логика</span><span class="d">Доменный сервис vs толстая модель vs сервис-объект: куда класть логику, которая не помещается в агрегат.</span></span>
+        <span class="arrow">→</span></a></li>
+    </ul>
+
+    <p class="track">Тренажёр</p>
+    <ul class="lessons">
+      <li><a class="lesson" href="lessons/0004-practice-placement.html">
+        <span class="n">04</span>
+        <span class="body"><span class="t">Куда положить логику</span><span class="d">Практика-тренажёр: разбираем кейсы и закрепляем выбор места для каждого вида логики.</span></span>
+        <span class="arrow">→</span></a></li>
+    </ul>
+
+    <p class="track">Стратегический уровень</p>
+    <ul class="lessons">
+      <li><a class="lesson" href="lessons/0005-bounded-context.html">
+        <span class="n">05</span>
+        <span class="body"><span class="t">Ограниченный контекст</span><span class="d">Как из агрегатов и сервисов собрать модуль и провести границу: Топология / Уязвимости / Документация.</span></span>
+        <span class="arrow">→</span></a></li>
+      <li><a class="lesson" href="lessons/0007-anti-corruption-layer.html">
+        <span class="n">07</span>
+        <span class="body"><span class="t">Анти-коррупционный слой</span><span class="d">Как формат внешнего сканера переводится в твой домен на границе и не протекает внутрь.</span></span>
+        <span class="arrow">→</span></a></li>
+    </ul>
+
+    <p class="track">Капстоун</p>
+    <ul class="lessons">
+      <li><a class="lesson" href="lessons/0006-capstone-scan-module.html">
+        <span class="n">06</span>
+        <span class="body"><span class="t">Спроектируй модуль «Скан → Находки»</span><span class="d">Самостоятельное проектирование: собираешь всё пройденное в один модуль.</span></span>
+        <span class="arrow">→</span></a></li>
+    </ul>
+
+    <p class="track">Повторение</p>
+    <ul class="lessons">
+      <li><a class="lesson" href="lessons/0008-spaced-review.html">
+        <span class="n">08</span>
+        <span class="body"><span class="t">Повторение с интервалом</span><span class="d">Смешанный прогон по всем семи урокам через паузу, чтобы знание осело в долгую память (storage strength).</span></span>
+        <span class="arrow">→</span></a></li>
+    </ul>
+  </section>
+
+  <section class="section">
+    <h2>Материалы курса</h2>
+    <ul class="reslist">
+      <li><a href="reference/value-object.html"><span class="ic">▤</span>Шпаргалка: Value Object</a></li>
+      <li><a href="MISSION.md"><span class="ic">◎</span>Миссия курса</a></li>
+      <li><a href="GLOSSARY.md"><span class="ic">▦</span>Глоссарий</a></li>
+      <li><a href="RESOURCES.md"><span class="ic">❖</span>Ресурсы / первоисточники</a></li>
+    </ul>
+    <p class="hint">Уроки идут строго по порядку 01 → 08. Внутри каждого урока в футере есть переходы «Назад ←» и «Дальше →», так что можно листать серию подряд. Материалы (.md) открываются как текст.</p>
+  </section>
+
+  <footer class="site-foot">
+    <span>Курс · DDD для модулей в Rails</span>
+    <span><a href="../../index.html">← Ко всем материалам</a></span>
+  </footer>
+
+</div>
+</body>
+</html>

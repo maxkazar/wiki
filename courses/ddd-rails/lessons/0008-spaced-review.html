@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Лессон 08 — Повторение с интервалом</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+
+<header class="masthead">
+  <p class="eyebrow">Лессон 08 · DDD в Rails · Повторение (storage strength)</p>
+  <h1>Повторение с интервалом</h1>
+  <p class="subtitle">Смешанный прогон по всем семи лессонам. Цель — не «вспомнить сейчас», а чтобы знание осело надолго. Усилие припоминания здесь — это фича, не баг.</p>
+</header>
+
+<div class="note">
+  <span class="callout-label">Как извлечь максимум</span>
+  Этот лессон работает лучше всего <b>через паузу</b> после остального курса — день, а лучше два-три. Тогда припоминание даётся с усилием, и именно это усилие переводит знание в долгую память (<span class="term">spaced retrieval</span>). Он живёт в воркспейсе — <b>возвращайся и проходи его повторно</b> через неделю, через месяц. Каждый повтор укрепляет след.
+</div>
+
+<h2>Часть 1 · Свободное припоминание</h2>
+<p>Не подглядывая и без вариантов — <b>проговори ответ вслух или запиши</b>, и только потом разверни сверку. Свободное припоминание сильнее узнавания.</p>
+
+<details class="reveal">
+  <summary>Вспомни 4 уровня лестницы «куда положить логику» (Л03–04)</summary>
+  <ul>
+    <li><b>1.</b> Про одно значение → метод <b>объекта-значения</b>.</li>
+    <li><b>2.</b> Про состояние одного агрегата + инвариант → <b>команда корня</b>.</li>
+    <li><b>3.</b> «Ничья», несколько агрегатов, без I/O → <b>доменный сервис</b>.</li>
+    <li><b>4.</b> Оркестрация + сайд-эффекты → <b>прикладной сервис-объект</b>.</li>
+    <li><b>0.</b> Запах: логика читает поля одной модели и кладёт назад → <b>вернуть на модель</b>.</li>
+  </ul>
+</details>
+
+<details class="reveal">
+  <summary>Вспомни 3 обязательных свойства Value Object (Л01)</summary>
+  <ul>
+    <li><b>Иммутабельность</b> — создан и не меняется (<code>freeze</code>).</li>
+    <li><b>Валидность по построению</b> — невалидный объект не существует (конструктор падает).</li>
+    <li><b>Поведение едет с данными</b> — вопросы к значению это его методы.</li>
+  </ul>
+</details>
+
+<details class="reveal">
+  <summary>Вспомни 3 слоя анти-коррупционного слоя (Л07)</summary>
+  <ul>
+    <li><b>Adapter</b> — протокол: HTTP, авторизация, ретраи.</li>
+    <li><b>Translator</b> — чужой формат → доменные объекты (тут умирает чужой словарь).</li>
+    <li><b>Facade / порт</b> — публичный вход в языке твоего домена.</li>
+  </ul>
+</details>
+
+<details class="reveal">
+  <summary>Вспомни, где проходит граница ограниченного контекста (Л05)</summary>
+  <ul>
+    <li>Там, где <b>смысл термина меняется</b> («нужна другая модель, когда меняется язык»).</li>
+    <li>Через границу — <b>id + публичный интерфейс/события</b>, не лазая в чужие внутренности.</li>
+    <li>Не дроби, где слово значит одно и то же; не объединяй, где значит разное.</li>
+  </ul>
+</details>
+
+<h2>Часть 2 · Смешанные кейсы (все 7 лессонов)</h2>
+<p>Перемешано намеренно. Реши сам — потом жми и читай фидбэк. Счёт сверху.</p>
+
+<div class="trainer" data-trainer>
+  <div class="trainer-bar"><span class="trainer-progress"></span><span class="trainer-score"></span></div>
+
+  <!-- 1 · L01 -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">Что из перечисленного — <b>объект-значение</b>?</p>
+    <button data-correct>CvssScore: 0–10 плюс поведение severity</button>
+    <button>Scan: имеет id, статус и историю</button>
+    <button>Document: уникальный отчёт с владельцем</button>
+    <p class="explain" hidden><b>CvssScore.</b> Нет идентичности, важно значение, поведение (severity) едет с данными. Scan и Document — Entity: у них есть «тот же самый» по id.</p>
+  </div>
+
+  <!-- 2 · L05 -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">Что сигналит, что между двумя модулями проходит граница контекста?</p>
+    <button data-correct>Одно слово значит в них разное</button>
+    <button>У модулей много общих таблиц</button>
+    <button>Один модуль крупнее другого</button>
+    <p class="explain" hidden><b>Слово меняет смысл.</b> Граница контекста — там, где сдвигается язык. «Актив» как узел графа vs как запись отчёта — два значения, два контекста.</p>
+  </div>
+
+  <!-- 3 · L07 -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">Зачем анти-коррупционный слой на интеграции со сканером?</p>
+    <button data-correct>Чтобы чужая модель не протекла в домен</button>
+    <button>Чтобы ускорить запросы к сканеру</button>
+    <button>Чтобы кэшировать ответы сканера</button>
+    <p class="explain" hidden><b>Чтобы чужая модель не протекла.</b> Без ACL словарь сканера (plugin_id, risk_factor) «разлагает» чистый домен. Перевод происходит один раз, на границе.</p>
+  </div>
+
+  <!-- 4 · L02 -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">Кто гарантирует инвариант «нет висячих связей» в графе топологии?</p>
+    <button data-correct>Корень агрегата через свои команды</button>
+    <button>Валидации в каждом контроллере</button>
+    <button>Отдельный внешний доменный сервис</button>
+    <p class="explain" hidden><b>Корень агрегата.</b> Инвариант охраняет единственная дверь — <code>topology.connect</code>. Размазать проверки по контроллерам = гарантий нет.</p>
+  </div>
+
+  <!-- 5 · L03 -->
+  <div class="tcard" data-tcard>
+    <p class="scenario"><code>RunScan</code>: дёргает внешний API, сохраняет находки, шлёт уведомление. Это…</p>
+    <button data-correct>Прикладной сервис-объект (оркестрация)</button>
+    <button>Доменный сервис без всякого I/O</button>
+    <button>Обычный метод агрегата Scan</button>
+    <p class="explain" hidden><b>Прикладной сервис-объект.</b> Внешний I/O + запись + уведомление — оркестрация, доменных правил нет. Не путать с доменным сервисом (чистый расчёт).</p>
+  </div>
+
+  <!-- 6 · L05 -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">«Актив» нужен и Топологии, и Документации. Как моделировать?</p>
+    <button data-correct>Две модели, связанные общим asset_id</button>
+    <button>Одна большая модель Asset на всех</button>
+    <button>AssetEntry наследует от Node</button>
+    <p class="explain" hidden><b>Две модели, общий id.</b> Каждый контекст держит свою модель «Актива» под свой язык. Единая бог-модель — унификация, которая «не окупается».</p>
+  </div>
+
+  <!-- 7 · L07 -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">Перевод формата Nessus в доменный <code>Finding</code> живёт в…</p>
+    <button data-correct>Транслейторе между адаптером и доменом</button>
+    <button>Адаптере, рядом с HTTP и ретраями</button>
+    <button>Самой доменной модели Finding</button>
+    <p class="explain" hidden><b>В транслейторе.</b> Adapter — только протокол; Translator — маппинг чужого JSON в домен. Finding о чужом формате не знает.</p>
+  </div>
+
+  <!-- 8 · L04 -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">Сервис читает поля одной <code>Finding</code>, считает число и кладёт назад. Реакция?</p>
+    <button data-correct>Вернуть поведение на саму модель</button>
+    <button>Одобрить: это чистый доменный сервис</button>
+    <button>Обернуть его ещё одним сервисом</button>
+    <p class="explain" hidden><b>Вернуть на модель.</b> Запах анемии: поведение сбежало от своих данных. Один агрегат + чтение себя = метод модели, не сервис.</p>
+  </div>
+
+  <!-- 9 · L05 -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">Документации нужны результаты скана из контекста «Уязвимости». Как?</p>
+    <button data-correct>Через публичный фасад или событие</button>
+    <button>Прямым запросом к Vulnerabilities::Finding</button>
+    <button>Скопировать таблицу находок к себе</button>
+    <p class="explain" hidden><b>Фасад или событие.</b> Контекст не лезет в чужие внутренности — «модуль не зовёт код другого модуля». Просим через одну дверь или подпиской на <code>ScanCompleted</code>.</p>
+  </div>
+
+  <!-- 10 · L07 -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">Что НЕ должно жить внутри анти-коррупционного слоя?</p>
+    <button data-correct>Бизнес-правила и оркестрация домена</button>
+    <button>Маппинг чужих полей в домен</button>
+    <button>Валидация внешнего ввода на границе</button>
+    <p class="explain" hidden><b>Бизнес-правила.</b> ACL — только перевод (+ валидация на границе доверия). Логика домена остаётся на агрегатах и сервисах.</p>
+  </div>
+
+  <!-- 11 · L02 -->
+  <div class="tcard" data-tcard>
+    <p class="scenario"><code>Finding</code> ссылается на узел из агрегата топологии через…</p>
+    <button data-correct>asset_id по идентичности</button>
+    <button>belongs_to Topology::Node</button>
+    <button>копию всех полей узла</button>
+    <p class="explain" hidden><b>asset_id.</b> Через границу агрегата/контекста — только ссылка по id, не AR-ассоциация, которая тянет и связывает чужой агрегат.</p>
+  </div>
+
+  <!-- 12 · L07 -->
+  <div class="tcard" data-tcard>
+    <p class="scenario">Сменили сканер Nessus → OpenVAS. Что приходится переписать?</p>
+    <button data-correct>Только новый адаптер и транслейтор</button>
+    <button>Доменную модель Finding и CvssScore</button>
+    <button>Команды агрегата Scan</button>
+    <p class="explain" hidden><b>Адаптер и транслейтор.</b> Домен зависит от порта <code>VulnerabilityScanner</code> в своём языке, а не от вендора. В этом весь выигрыш ACL.</p>
+  </div>
+
+  <div class="trainer-final" hidden></div>
+</div>
+
+<div class="review">
+  <span class="callout-label">Куда дальше расти</span>
+  Знаниевая база командного стандарта собрана. Самый сильный следующий шаг — <b>навык на живом коде</b>: принеси на разбор реальный модуль или PR вашей системы, и прогоним его по чек-листам из лессонов. И поделись стандартом с командой — <a href="../GLOSSARY.md">глоссарий</a> и шпаргалки готовы к расшариванию.
+</div>
+
+<p class="ask">Где-то ошибся в кейсах или захотелось перечитать тему — скажи какую, и я дам короткий точечный разбор именно по ней (повторно гонять весь курс не нужно).</p>
+
+<div class="footer">
+  <b>Курс:</b> DDD для модулей в Rails ·
+  <b>Назад ←</b> <a href="0007-anti-corruption-layer.html">Лессон 07: ACL</a> ·
+  <b>Все лессоны:</b> <a href="0001-value-object.html">01</a> · <a href="0002-aggregate.html">02</a> · <a href="0003-domain-service.html">03</a> · <a href="0004-practice-placement.html">04</a> · <a href="0005-bounded-context.html">05</a> · <a href="0006-capstone-scan-module.html">06</a> · <a href="0007-anti-corruption-layer.html">07</a>
+  <br><br>
+  <b>Связано:</b> <a href="../GLOSSARY.md">Глоссарий</a> · <a href="../MISSION.md">Миссия</a> · <a href="../RESOURCES.md">Ресурсы</a>
+</div>
+
+<script src="../assets/trainer.js"></script>
+</body>
+</html>

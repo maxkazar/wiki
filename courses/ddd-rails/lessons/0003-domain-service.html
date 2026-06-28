@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Лессон 03 — Где живёт логика: доменный сервис vs толстая модель</title>
+<link rel="stylesheet" href="../assets/lesson.css">
+</head>
+<body>
+
+<header class="masthead">
+  <p class="eyebrow">Лессон 03 · DDD в Rails · Калибровка</p>
+  <h1>Где живёт логика?</h1>
+  <p class="subtitle">Доменный сервис vs толстая модель vs сервис-объект. Самый частый способ испортить «командный стандарт» — выносить в сервисы то, что должно жить на агрегате.</p>
+</header>
+
+<p>Этот лессон прямо отвечает на твою задачу: <b>отличать честный доменный код от оверинжиниринга на ревью</b>. У новичков в DDD один типовой рефлекс — на любую логику плодить <code>SomethingService</code>. Результат — <span class="term">анемичная модель</span> <span class="en">(anemic domain model)</span>: модели превращаются в «голые держатели данных без поведения».<sup><a href="#src1">1</a></sup> Tangible win: <b>научиться класть логику на правильный уровень с первого раза</b>.</p>
+
+<h2>Установка: по умолчанию — на агрегат</h2>
+
+<p>Команда 37signals (авторы Rails) ставит вопрос ребром: вместо <em>«как изолировать персистентность от доменной логики»</em> — <em>«а зачем?»</em>.<sup><a href="#src1">1</a></sup> Когда ORM хорошо вплавлен в язык, насильно разносить данные и поведение — лишняя церемония. Логика про <em>один</em> агрегат живёт <b>на агрегате</b> (метод/команда из <a href="0002-aggregate.html">Лессона 02</a>), а не в отдельном сервисе.</p>
+
+<div class="insight">
+  <span class="callout-label">Правило по умолчанию</span>
+  Поведение принадлежит тому, чьи данные оно меняет. «Эта связь — петля?» → метод <code>Topology</code>. «Эта оценка критична?» → метод <code>CvssScore</code>. Сервис-объект здесь — это вынести поведение прочь от данных и получить анемичную модель.
+</div>
+
+<h2>Лестница решений: четыре уровня</h2>
+
+<p>Прежде чем завести класс — спроси, на каком уровне логика. Иди сверху вниз, останавливайся на первом «да».</p>
+
+<table style="border-collapse:collapse;width:100%;font-size:0.9rem;margin:1rem 0">
+  <tr style="border-bottom:2px solid #1a1a1a">
+    <th style="text-align:left;padding:.5rem">Вопрос</th><th style="text-align:left;padding:.5rem">Куда</th><th style="text-align:left;padding:.5rem">Пример (домен ИБ)</th>
+  </tr>
+  <tr style="border-bottom:1px solid #e6e2d3">
+    <td style="padding:.5rem">Логика про состояние <b>одного</b> агрегата?</td>
+    <td style="padding:.5rem"><b>Метод/команда на агрегате</b></td>
+    <td style="padding:.5rem"><code>topology.connect(a, b)</code></td>
+  </tr>
+  <tr style="border-bottom:1px solid #e6e2d3">
+    <td style="padding:.5rem">Связный пучок поведения на одной модели разросся?</td>
+    <td style="padding:.5rem"><b>Concern / PORO-делегат</b></td>
+    <td style="padding:.5rem"><code>Node::Reachability</code></td>
+  </tr>
+  <tr style="border-bottom:1px solid #e6e2d3">
+    <td style="padding:.5rem">Логика принадлежит <b>нескольким</b> агрегатам / это процесс домена, а не вещь?</td>
+    <td style="padding:.5rem"><b>Доменный сервис</b> (PORO)</td>
+    <td style="padding:.5rem"><code>AttackSurface<wbr>Calculator</code></td>
+  </tr>
+  <tr>
+    <td style="padding:.5rem">Это оркестрация: транзакция + сайд-эффекты (письма, джобы)?</td>
+    <td style="padding:.5rem"><b>Сервис-объект</b> (прикладной)</td>
+    <td style="padding:.5rem"><code>RunScan</code></td>
+  </tr>
+</table>
+
+<h2>Уровень 2: вплавить, не выносить (37signals)</h2>
+<p>Когда поведение всё ещё про <em>одну</em> модель, но раздувает её — не вынось наружу, а сгруппируй <b>внутри</b> через <span class="term">Concern</span> или PORO-делегат. 37signals именно так держат модели богатыми: concerns и PORO инкапсулируют сложность <em>внутри</em> Active Record.<sup><a href="#src1">1</a></sup></p>
+
+<pre><code><span class="good"># app/models/node/reachability.rb — concern, логика рядом с данными</span>
+module Node::Reachability
+  extend ActiveSupport::Concern
+  def reachable_from?(other) = topology.path?(other, self)
+end
+
+class Node < ApplicationRecord
+  include Reachability   <span class="good"># модель остаётся богатой, не анемичной</span>
+end</code></pre>
+
+<h2>Уровень 3: доменный сервис — для «ничьей» логики</h2>
+<p><span class="term">Доменный сервис</span> <span class="en">(Domain Service)</span> нужен, когда логика — это <b>деятельность домена</b>, не принадлежащая ни одному агрегату. Признак: она тянет <em>несколько</em> агрегатов сразу. «Пересчитать поверхность атаки» смотрит и на топологию, и на находки — это не метод узла и не метод находки.</p>
+
+<pre><code><span class="good"># app/domain/security/attack_surface_calculator.rb</span>
+module Security
+  class AttackSurfaceCalculator        <span class="good"># PORO, без состояния</span>
+    def initialize(topology:, findings:)
+      @topology, @findings = topology, findings
+    end
+
+    <span class="good"># назван глаголом-деятельностью домена, возвращает результат домена</span>
+    def call
+      exposed = @topology.boundary_nodes
+      exposed.sum { |n| @findings.critical_on(n.id).count }
+    end
+  end
+end</code></pre>
+
+<div class="note">
+  <span class="callout-label">Доменный сервис ≠ сервис-объект</span>
+  <b>Доменный сервис</b> содержит правила домена и <b>не делает I/O</b> (ни писем, ни джоб, ни внешних API) — чистый расчёт, легко тестируется. <b>Сервис-объект</b> (уровень 4, прикладной) — это <em>оркестратор</em>: открывает транзакцию, зовёт доменный код, потом шлёт уведомления и ставит джобы. Доменных правил в нём нет. Не смешивай эти два.
+</div>
+
+<div class="warn">
+  <span class="callout-label">Калибровка — запах оверинжиниринга</span>
+  Если <code>XxxService</code> просто берёт поля модели, что-то считает и кладёт обратно — поведение сбежало от данных. Верни его на модель/агрегат. 37signals: <em>«если у вас Active Record и проблемы с поддержкой кода — возможно, дело не в инструменте»</em>.<sup><a href="#src1">1</a></sup> Доменный сервис оправдан только когда логика честно <b>ничья</b> — про несколько агрегатов сразу.
+</div>
+
+<h2>Проверь себя</h2>
+<p>По памяти. Каждый ответ — это решение, которое ты будешь принимать на ревью.</p>
+
+<div class="quiz" data-quiz>
+  <p class="q">«Является ли CVSS-оценка критической?» Где этой логике место?</p>
+  <button data-correct>Метод на самом объекте CvssScore</button>
+  <button>Отдельный класс CvssSeverityService</button>
+  <button>Хелпер во вьюхе рядом с бейджем</button>
+  <p class="explain" hidden><b>Метод на CvssScore.</b> Логика про состояние одного объекта-значения. Выносить её в сервис — значит оторвать поведение от данных и получить анемичную модель. Уровень 1 лестницы.</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="quiz" data-quiz>
+  <p class="q">«Пересчитать поверхность атаки по топологии и находкам». Куда?</p>
+  <button data-correct>Доменный сервис над двумя агрегатами</button>
+  <button>Метод на агрегате одной топологии</button>
+  <button>Колбэк after_save в модели Scan</button>
+  <p class="explain" hidden><b>Доменный сервис.</b> Логика тянет сразу два агрегата (Topology и Findings) и не принадлежит ни одному — это деятельность домена, «ничья». PORO без состояния и без I/O. Уровень 3.</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="quiz" data-quiz>
+  <p class="q">Видишь PORO, который читает поля модели и кладёт результат назад. Реакция?</p>
+  <button data-correct>Вернуть поведение на саму модель</button>
+  <button>Одобрить: сервисы это всегда чисто</button>
+  <button>Добавить ещё сервис поверх него</button>
+  <p class="explain" hidden><b>Вернуть на модель.</b> Это запах: поведение сбежало от своих данных, модель анемична. Сервис оправдан, только если логика ничья (несколько агрегатов) или это прикладная оркестрация с сайд-эффектами.</p>
+  <button class="retry" hidden>↻ ещё раз</button>
+</div>
+
+<div class="review">
+  <span class="callout-label">Как защитить на ревью</span>
+  Перед каждым новым <code>XxxService</code> прогоняй PR по лестнице: <b>(1)</b> про один агрегат? → метод на нём. <b>(2)</b> раздувает одну модель? → concern. <b>(3)</b> ничья, про несколько агрегатов? → доменный сервис (PORO, без I/O). <b>(4)</b> оркестрация с сайд-эффектами? → прикладной сервис-объект. Формула команды: <b>«логика — на агрегат по умолчанию; сервис — только для ничьей логики или оркестрации»</b>.
+</div>
+
+<div class="source" id="src1">
+  <span class="callout-label">Первоисточник — прочитай это</span>
+  <a href="https://dev.37signals.com/active-record-nice-and-blended/">Active Record, nice and blended — 37signals</a>.
+  Контр-перспектива от авторов Rails: почему не стоит выносить логику в сервисы и как держать модели богатыми через concerns и PORO. Обязательно для калибровки командного стандарта. 8 минут.
+</div>
+
+<p class="ask">Спорный случай из твоего кода — «вот этот сервис, он честный или оверинжиниринг?» — приноси в чат. Разберём по лестнице на твоём примере; это ровно тот навык, что нужен на ревью.</p>
+
+<div class="footer">
+  <b>Курс:</b> DDD для модулей в Rails ·
+  <b>Назад ←</b> <a href="0002-aggregate.html">Лессон 02: Агрегат</a> ·
+  <b>Дальше →</b> Лессон 04: <i>Ограниченный контекст (Bounded Context)</i> — как из агрегатов и сервисов собрать сам модуль и провести границу между «Топология», «Уязвимости», «Документация».
+  <br><br>
+  <b>Связано:</b> <a href="../MISSION.md">Миссия</a> · <a href="../GLOSSARY.md">Глоссарий</a> · <a href="../RESOURCES.md">Ресурсы</a>
+</div>
+
+<script src="../assets/quiz.js"></script>
+</body>
+</html>
